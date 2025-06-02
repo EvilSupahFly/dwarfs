@@ -47,6 +47,8 @@ jobs:
       run: |
         git fetch upstream tag ${{ steps.upstream.outputs.tag }}
         git checkout -B update-${{ steps.upstream.outputs.tag }} upstream/${{ steps.upstream.outputs.tag }}
+    - name: Remove upstream GitHub workflows
+      run: rm -f .github/workflows/*.yml || true
 
     - name: Copy debian/ directory into working tree
       run: |
