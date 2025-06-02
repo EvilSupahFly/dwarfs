@@ -90,13 +90,13 @@ jobs:
 
     - name: Configure dput
       run: |
-        cat <<EOF > ~/.dput.cf
-[launchpad]
-fqdn = ppa.launchpad.net
-incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
-login = anonymous
-method = ftp
-EOF
+          cat <<EOF > ~/.dput.cf
+          [launchpad]
+          fqdn = ppa.launchpad.net
+          incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
+          login = anonymous
+          method = ftp
+          EOF
 
     - name: Upload to Launchpad
       run: |
