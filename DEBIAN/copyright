@@ -1,0 +1,7 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: DwarFS
+Source: https://github.com/mhx/dwarfs
+
+Files: *
+Copyright: 2018-2025 mhx
+License: MIT

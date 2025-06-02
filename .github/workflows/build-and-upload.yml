@@ -1,0 +1,104 @@
+name: Auto Sync, Build and Publish DwarFS
+
+on:
+  schedule:
+    - cron: "0 3 * * *"  # Daily check
+  workflow_dispatch:
+
+jobs:
+  check-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout your repo
+        uses: actions/checkout@v4
+
+      - name: Get latest upstream tag
+        id: latest
+        run: |
+          latest=$(curl -s https://api.github.com/repos/mhx/dwarfs/releases/latest | jq -r .tag_name)
+          echo "LATEST_TAG=$latest" >> $GITHUB_ENV
+
+      - name: Get current tag (if any)
+        id: current
+        run: |
+          git fetch --tags
+          current=$(git tag --sort=-creatordate | grep -E '^v' | head -n1 || echo "")
+          echo "CURRENT_TAG=$current" >> $GITHUB_ENV
+
+      - name: Skip if already up-to-date
+        if: env.LATEST_TAG == env.CURRENT_TAG
+        run: echo "Already at latest version: $CURRENT_TAG"
+
+      - name: Add upstream remote and merge latest
+        if: env.LATEST_TAG != env.CURRENT_TAG
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git remote add upstream https://github.com/mhx/dwarfs.git
+          git fetch upstream
+          git merge upstream/master --allow-unrelated-histories -m "Sync upstream"
+
+      - name: Tag new version
+        if: env.LATEST_TAG != env.CURRENT_TAG
+        run: |
+          git tag "${LATEST_TAG}"
+          git push origin "${LATEST_TAG}"
+          git push
+
+      - name: Download and decompress universal binary
+        run: |
+          wget "https://github.com/mhx/dwarfs/releases/download/${LATEST_TAG}/dwarfs-universal-${LATEST_TAG#v}-Linux-x86_64" -O dwarfs
+          chmod +x dwarfs
+          upx -d dwarfs
+
+      - name: Create debian packaging directory
+        run: |
+          mkdir -p dwarfs-${LATEST_TAG#v}/debian
+          mv dwarfs dwarfs-${LATEST_TAG#v}/usr/bin/
+          cp -r debian/* dwarfs-${LATEST_TAG#v}/debian/
+
+      - name: Install build dependencies
+        run: sudo apt-get update && sudo apt-get install -y devscripts debhelper dpkg-dev gnupg dput jq upx
+
+      - name: Import GPG key
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
+          echo RELOADAGENT | gpg-connect-agent
+          KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/ {print $5}' | head -n1)
+          echo "$KEYID" > keyid.txt
+          echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "$KEYID"
+        env:
+          GPG_TTY: ${{ runner.env.TERM }}
+
+      - name: Build source package
+        run: |
+          cd dwarfs-${LATEST_TAG#v}
+          debuild -S -sa -k"$(cat ../keyid.txt)" --no-lintian
+
+      - name: Configure dput
+        run: |
+          echo "[launchpad]
+fqdn = ppa.launchpad.net
+incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
+login = anonymous
+method = ftp
+" > ~/.dput.cf
+
+      - name: Upload to Launchpad PPA
+        run: |
+          CHANGES_FILE=$(ls ../*.changes | head -n1)
+          dput launchpad "$CHANGES_FILE"
+
+      - name: Create GitHub Release and upload artifacts
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.LATEST_TAG }}
+          name: Release ${{ env.LATEST_TAG }}
+          files: |
+            ../*.deb
+            ../*.dsc
+            ../*.tar.*
+            ../*.changes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
