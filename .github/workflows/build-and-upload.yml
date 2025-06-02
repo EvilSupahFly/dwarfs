@@ -27,8 +27,8 @@ jobs:
     - name: Get latest upstream tag
       id: upstream
       run: |
-        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
-
+#        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
+        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
     - name: Check if tag exists locally
       id: checktag
       run: |
@@ -37,6 +37,7 @@ jobs:
         else
           echo "found=false" >> $GITHUB_OUTPUT
         fi
+        echo "found=false" >> $GITHUB_OUTPUT
 
     - name: Exit if tag already exists
       if: steps.checktag.outputs.found == 'true'
