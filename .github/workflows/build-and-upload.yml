@@ -40,7 +40,10 @@ jobs:
 
     - name: Exit if tag already exists
       if: steps.checktag.outputs.found == 'true'
-      run: echo "No new upstream version. Exiting."
+      run: |
+        echo "No new upstream version. Exiting."
+        exit 0
+      continue-on-error: false
 
     - name: Fetch and checkout new upstream tag
       if: steps.checktag.outputs.found == 'false'
@@ -51,13 +54,16 @@ jobs:
       run: rm -f .github/workflows/*.yml || true
 
     - name: Copy debian/ directory into working tree
+      if: steps.checktag.outputs.found == 'false'
       run: |
-        git checkout origin/main -- debian
+        git checkout origin/main -- DEBIAN
 
     - name: Install dependencies
+      if: steps.checktag.outputs.found == 'false'
       run: sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
 
     - name: Download universal binary and decompress
+      if: steps.checktag.outputs.found == 'false'
       run: |
         URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.upstream.outputs.tag }}/dwarfs-universal-${{ steps.upstream.outputs.tag }}-Linux-x86_64"
         curl -L "$URL" -o dwarfs
@@ -68,14 +74,16 @@ jobs:
         chmod 755 usr/bin/dwarfs
 
     - name: Prepare source package
+      if: steps.checktag.outputs.found == 'false'
       run: |
         mkdir build && cd build
-        cp -r ../usr ../debian .
+        cp -r ../usr ../DEBIAN .
         tar czf ../dwarfs_${{ steps.upstream.outputs.tag }}.orig.tar.gz usr
         cd ..
         dpkg-source -b .
 
     - name: Import GPG key
+      if: steps.checktag.outputs.found == 'false'
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
         echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
@@ -87,10 +95,12 @@ jobs:
         GPG_TTY: ${{ runner.env.TERM }}
 
     - name: Build source package
+      if: steps.checktag.outputs.found == 'false'
       run: |
         debuild -S -sa --no-lintian -k"$(cat keyid.txt)"
 
     - name: Configure dput
+      if: steps.checktag.outputs.found == 'false'
       run: |
           cat <<EOF > ~/.dput.cf
           [launchpad]
@@ -101,6 +111,7 @@ jobs:
           EOF
 
     - name: Upload to Launchpad
+      if: steps.checktag.outputs.found == 'false'
       run: |
         CHANGES_FILE=$(ls ../*.changes | head -n1)
         dput launchpad "$CHANGES_FILE"
