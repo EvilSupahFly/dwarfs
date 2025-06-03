@@ -39,7 +39,6 @@ jobs:
           echo "Detected upstream tag: $TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         fi
-        echo "Upstream tag is ${{ steps.upstream.outputs.tag }}"
 
     - name: 3.5 - Resolve actual latest upstream tag
       id: resolved
@@ -50,22 +49,25 @@ jobs:
         else
           echo "resolved_tag=${{ steps.upstream.outputs.tag }}" >> $GITHUB_OUTPUT
         fi
-        echo "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
 
     - name: 4 - Check if tag exists locally
       id: checktag
       run: |
+        echo "github.event.inputs.use_fake_tag = ${{ github.event.inputs.use_fake_tag }}"
+        echo "steps.upstream.outputs.tag = ${{ steps.upstream.outputs.tag }}"
+        echo "steps.resolved.outputs.resolved_tag = ${{ steps.resolved.outputs.resolved_tag }}"
         if git rev-parse "refs/tags/${{ steps.resolved.outputs.resolved_tag }}" >/dev/null 2>&1; then
           echo "found=exists" >> "$GITHUB_OUTPUT"
         else
           echo "found=missing" >> "$GITHUB_OUTPUT"
         fi
-        echo "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
-        echo "Found tag is ${{ steps.checktag.outputs.found }}"
 
     - name: 4.5 - Debug checktag output
       run: |
-        echo -e "Found tag is ${{ steps.checktag.outputs.found }}\n\n"
+        echo "github.event.inputs.use_fake_tag = ${{ github.event.inputs.use_fake_tag }}"
+        echo "steps.upstream.outputs.tag = ${{ steps.upstream.outputs.tag }}"
+        echo "steps.resolved.outputs.resolved_tag = ${{ steps.resolved.outputs.resolved_tag }}"
+        echo "steps.checktag.outputs.found = ${{ steps.checktag.outputs.found }}"
         cat "$GITHUB_OUTPUT"
 
     - name: 5 - Exit if tag already exists
@@ -131,9 +133,11 @@ jobs:
         echo "Build-Depends: debhelper (>= 11)" >> debian/control
         echo "" >> debian/control
         echo "Package: dwarfs" >> debian/control
+        echo "Version: ${TAG_NO_V}-1" >> debian/control
         echo "Architecture: amd64" >> debian/control
         echo "Depends: fuse3, \${misc:Depends}" >> debian/control
         echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
+        echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
         echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
         echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
         echo '#!/usr/bin/make -f' > debian/rules
@@ -145,7 +149,8 @@ jobs:
         echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
         echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
         chmod +x debian/rules
-        dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"
+        export DEBEMAIL="github@mhxnet.de"
+        dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
         echo "12" > debian/compat
 
     - name: 12 - Build packages
