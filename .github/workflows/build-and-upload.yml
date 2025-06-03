@@ -56,18 +56,28 @@ jobs:
       id: checktag
       run: |
         if git rev-parse "refs/tags/${{ steps.resolved.outputs.resolved_tag }}" >/dev/null 2>&1; then
-          echo "found=true" >> $GITHUB_OUTPUT
+          echo "found=exists" >> "$GITHUB_OUTPUT"
         else
-          echo "found=false" >> $GITHUB_OUTPUT
+          echo "found=missing" >> "$GITHUB_OUTPUT"
         fi
         echo "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
+        echo "Found tag is ${{ steps.checktag.outputs.found }}"
+
+    - name: 4.5 - Debug checktag output
+      run: |
+        echo -e "Found tag is ${{ steps.checktag.outputs.found }}\n\n"
+        cat "$GITHUB_OUTPUT"
 
     - name: 5 - Exit if tag already exists
-      if: steps.checktag.outputs.found == 'true'
+      if: steps.checktag.outputs.found == 'exists'
       run: |
         echo "No new upstream version. Exiting."
         exit 0
       continue-on-error: false
+
+    - name: 5.5 - Debug fallback
+      if: steps.checktag.outputs.found == ''
+      run: echo "Output was not set properly"
 
     - name: 6 - Fetch and checkout new upstream tag
       run: |
@@ -103,7 +113,7 @@ jobs:
         upx -d dwarfs || echo "Already decompressed"
         mkdir -p dwarfs-${TAG_NO_V}/usr/bin
         mv dwarfs dwarfs-${TAG_NO_V}/usr/bin/dwarfs
-        chmod 755 usr/bin/dwarfs
+        chmod 755 dwarfs-${TAG_NO_V}/usr/bin/dwarfs
 
     - name: 11 - Prepare source package
       run: |
