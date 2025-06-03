@@ -123,16 +123,16 @@ Build-Depends: debhelper (>= 11)
 
 Package: dwarfs
 Architecture: amd64
-Depends: fuse3, ${misc:Depends}
+Depends: fuse3, \${misc:Depends}
 Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)
  Precompiled universal binary repackaged as a Debian package.
  Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver.
 EOF
 
-        cat > debian/rules <<'EOF'
+        cat > debian/rules <<EOF
 #!/usr/bin/make -f
 %:
-	dh $@
+	dh \$@
 override_dh_auto_build:
 	# nothing to build
 override_dh_auto_install:
