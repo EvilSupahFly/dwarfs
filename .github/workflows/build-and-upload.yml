@@ -39,8 +39,8 @@ jobs:
           echo "Detected upstream tag: $TAG"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         fi
-#        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
-#        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
+        echo "Upstream tag is ${{ steps.upstream.outputs.tag }}"
+
     - name: 3.5 - Resolve actual latest upstream tag
       id: resolved
       run: |
@@ -50,15 +50,17 @@ jobs:
         else
           echo "resolved_tag=${{ steps.upstream.outputs.tag }}" >> $GITHUB_OUTPUT
         fi
+        echo "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
+
     - name: 4 - Check if tag exists locally
       id: checktag
       run: |
-        if git rev-parse "refs/tags/${{ steps.upstream.outputs.tag }}" >/dev/null 2>&1; then
+        if git rev-parse "refs/tags/${{ steps.resolved.outputs.resolved_tag }}" >/dev/null 2>&1; then
           echo "found=true" >> $GITHUB_OUTPUT
         else
           echo "found=false" >> $GITHUB_OUTPUT
         fi
-        echo "found=false" >> $GITHUB_OUTPUT
+        echo "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
 
     - name: 5 - Exit if tag already exists
       if: steps.checktag.outputs.found == 'true'
@@ -72,8 +74,6 @@ jobs:
         TAG="${{ steps.resolved.outputs.resolved_tag }}"
         git fetch upstream --tags || true
         git checkout -B update-"$TAG" "upstream/$TAG" || git checkout -b update-"$TAG"
-#        git fetch upstream tag ${{ steps.upstream.outputs.tag }}
-#        git checkout -B update-${{ steps.upstream.outputs.tag }} upstream/${{ steps.upstream.outputs.tag }}
 
     - name: 7 - Remove upstream GitHub workflows
       run: rm -f .github/workflows/*.yml || true
