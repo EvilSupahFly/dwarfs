@@ -113,36 +113,30 @@ jobs:
         echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
         cd dwarfs-${TAG_NO_V}
         mkdir debian
-        printf '%s\n' \
-"Source: dwarfs" \
-"Maintainer: mhx github@mhxnet.de" \
-"Section: utils" \
-"Priority: optional" \
-"Standards-Version: 4.5.0" \
-"Build-Depends: debhelper (>= 11)" \
-"" \
-"Package: dwarfs" \
-"Architecture: amd64" \
-"Depends: fuse3, \${misc:Depends}" \
-"Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" \
-" Precompiled universal binary repackaged as a Debian package." \
-" Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." \
-        > debian/control
-
-        printf '%s\n' \
-"#!/usr/bin/make -f" \
-"%" \
-"    dh \$@" \
-"override_dh_auto_build:" \
-"    # nothing to build" \
-"override_dh_auto_install:" \
-"    mkdir -p debian/dwarfs/usr/bin" \
-"    cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/" \
-        > debian/rules
-
-    chmod +x debian/rules
-    dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"    # Changelog
-    echo "12" > debian/compat    # Compat (if needed)
+        echo "Source: dwarfs" > debian/control
+        echo "Maintainer: mhx github@mhxnet.de" >> debian/control
+        echo "Section: utils" >> debian/control
+        echo "Priority: optional" >> debian/control
+        echo "Standards-Version: 4.5.0" >> debian/control
+        echo "Build-Depends: debhelper (>= 11)" >> debian/control
+        echo "" >> debian/control
+        echo "Package: dwarfs" >> debian/control
+        echo "Architecture: amd64" >> debian/control
+        echo "Depends: fuse3, \${misc:Depends}" >> debian/control
+        echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
+        echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
+        echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
+        echo '#!/usr/bin/make -f' > debian/rules
+        echo '%:' >> debian/rules
+        echo '	dh $@' >> debian/rules
+        echo 'override_dh_auto_build:' >> debian/rules
+        echo '	# nothing to build' >> debian/rules
+        echo 'override_dh_auto_install:' >> debian/rules
+        echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
+        echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
+        chmod +x debian/rules
+        dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"
+        echo "12" > debian/compat
 
     - name: 12 - Build packages
       run: |
