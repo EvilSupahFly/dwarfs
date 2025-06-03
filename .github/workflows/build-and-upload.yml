@@ -113,32 +113,32 @@ jobs:
         echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
         cd dwarfs-${TAG_NO_V}
         mkdir debian
-        cat > debian/control <<EOF
-Source: dwarfs
-Maintainer: mhx github@mhxnet.de
-Section: utils
-Priority: optional
-Standards-Version: 4.5.0
-Build-Depends: debhelper (>= 11)
+        printf '%s\n' \
+"Source: dwarfs" \
+"Maintainer: mhx github@mhxnet.de" \
+"Section: utils" \
+"Priority: optional" \
+"Standards-Version: 4.5.0" \
+"Build-Depends: debhelper (>= 11)" \
+"" \
+"Package: dwarfs" \
+"Architecture: amd64" \
+"Depends: fuse3, \${misc:Depends}" \
+"Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" \
+" Precompiled universal binary repackaged as a Debian package." \
+" Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." \
+        > debian/control
 
-Package: dwarfs
-Architecture: amd64
-Depends: fuse3, \\${misc:Depends}
-Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)
- Precompiled universal binary repackaged as a Debian package.
- Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver.
-EOF
-
-        cat > debian/rules <<EOF
-#!/usr/bin/make -f
-%:
-    dh \\$@
-override_dh_auto_build:
-    # nothing to build
-override_dh_auto_install:
-    mkdir -p debian/dwarfs/usr/bin
-    cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/
-EOF
+        printf '%s\n' \
+"#!/usr/bin/make -f" \
+"%" \
+"    dh \$@" \
+"override_dh_auto_build:" \
+"    # nothing to build" \
+"override_dh_auto_install:" \
+"    mkdir -p debian/dwarfs/usr/bin" \
+"    cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/" \
+        > debian/rules
 
     chmod +x debian/rules
     dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"    # Changelog
