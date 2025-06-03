@@ -190,15 +190,15 @@ jobs:
       run: |
         dput ppa:seann-giffin/dwarfs ../dwarfs_*.changes
 
-    - name: 16 - Upload Aritifacts to GitHub Releases
-        uses: softprops/action-gh-release@v1
-          with:
-            tag_name: v${{ steps.parsed.outputs.tag_no_v }}
-            name: DwarFS v${{ steps.parsed.outputs.tag_no_v }}
-            files: |
-              dwarfs_${{ steps.parsed.outputs.tag_no_v }}_amd64.deb
-              dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz
-              dwarfs_${{ steps.parsed.outputs.tag_no_v }}.dsc
-              dwarfs_${{ steps.parsed.outputs.tag_no_v }}.changes
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: 16 - Upload Artifacts to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.parsed.outputs.tag_no_v }}
+        name: DwarFS v${{ steps.parsed.outputs.tag_no_v }}
+        files: |
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}_amd64.deb
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.dsc
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
