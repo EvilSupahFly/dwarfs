@@ -79,7 +79,7 @@ jobs:
     - name: 7 - Remove upstream GitHub workflows
       run: rm -f .github/workflows/*.yml || true
 
-    - name: 8 - Copy debian/ directory into working tree
+    - name: 8 - Copy DEBIAN/ directory into working tree
       run: |
         git checkout origin/main -- DEBIAN
 
@@ -93,29 +93,85 @@ jobs:
 
     - name: 10 - Download universal binary and decompress
       run: |
-        echo "Resolved tag is ${{ steps.parsed.outputs.resolved_tag }}"
-        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }}"
-        URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.resolved.outputs.resolved_tag }}/dwarfs-universal-${{ steps.parsed.outputs.tag_no_v }}-Linux-x86_64"
+        TAG="${{ steps.resolved.outputs.resolved_tag }}"
+        TAG_NO_V="${TAG#v}"
+        echo "Resolved tag is ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
+        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
+        URL="https://github.com/mhx/dwarfs/releases/download/${TAG}/dwarfs-universal-${TAG_NO_V}-Linux-x86_64"
         curl -L "$URL" -o dwarfs
         chmod +x dwarfs
         upx -d dwarfs || echo "Already decompressed"
-        mkdir -p usr/bin
-        mv dwarfs usr/bin/dwarfs
+        mkdir -p dwarfs-${TAG_NO_V}/usr/bin
+        mv dwarfs dwarfs-${TAG_NO_V}/usr/bin/dwarfs
         chmod 755 usr/bin/dwarfs
 
     - name: 11 - Prepare source package
       run: |
-        echo -e "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
-        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }}"
-        mkdir build && cd build
-        cp -r ../usr ../DEBIAN .
-        tar czf ../dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz usr
-        cd ..
+        TAG="${{ steps.resolved.outputs.resolved_tag }}"
+        TAG_NO_V="${TAG#v}"
+        echo "Resolved tag is ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
+        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
+        cd dwarfs-${TAG_NO_V}
+        mkdir debian
+        cat > debian/control <<EOF
+Source: dwarfs
+Maintainer: mhx github@mhxnet.de
+Section: utils
+Priority: optional
+Standards-Version: 4.5.0
+Build-Depends: debhelper (>= 11)
+
+Package: dwarfs
+Architecture: amd64
+Depends: fuse3, ${misc:Depends}
+Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)
+ Precompiled universal binary repackaged as a Debian package.
+ Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver.
+EOF
+
+        cat > debian/rules <<'EOF'
+#!/usr/bin/make -f
+%:
+	dh $@
+override_dh_auto_build:
+	# nothing to build
+override_dh_auto_install:
+	mkdir -p debian/dwarfs/usr/bin
+	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/
+EOF
+
+    chmod +x debian/rules
+
+    # Changelog
+    dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"
+
+    # Compat (if needed)
+    echo "12" > debian/compat
+#        mkdir build && cd build
+#        mkdir -p dwarfs-${TAG_NO_V}/usr/bin
+#        cp -r ../usr ../DEBIAN .
+#        tar czf ../dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz usr
+#        cd ..
+#        dpkg-source -b .
+
+    - name: 12 - Build packages
+      run: |
+        TAG_NO_V="${{ steps.parsed.outputs.tag_no_v }}"
+        cd dwarfs-${TAG_NO_V}
+
+        # Create .orig.tar.gz from source dir (excluding debian/)
+        tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
+
+        # Build source package
         dpkg-source -b .
 
-    - name: 12 - Import GPG key
+        # Build binary .deb (for local install or testing)
+        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb
+
+    - name: 13 - Import GPG key
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        echo -e "trust\n5\ny\n" | gpg --command-fd 0 --batch --edit-key "${{ secrets.GPG_KEY_ID }}"
         echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
         echo RELOADAGENT | gpg-connect-agent
         KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/ {print $5}' | head -n1)
@@ -124,21 +180,23 @@ jobs:
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
-    - name: 13 - Build source package
+    - name: 14 - Sign Packages
       run: |
-        debuild -S -sa --no-lintian -k"$(cat keyid.txt)"
+        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.dsc
+        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.changes
 
-    - name: 14 - Configure dput
-      run: |
-          cat <<EOF > ~/.dput.cf
-          [launchpad]
-          fqdn = ppa.launchpad.net
-          incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
-          login = anonymous
-          method = ftp
-          EOF
+#    - name: 14 - Configure dput
+#      run: |
+#          cat <<EOF > ~/.dput.cf
+#          [launchpad]
+#          fqdn = ppa.launchpad.net
+#          incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
+#          login = anonymous
+#          method = ftp
+#          EOF
 
     - name: 15 - Upload to Launchpad
       run: |
-        CHANGES_FILE=$(ls ../*.changes | head -n1)
-        dput launchpad "$CHANGES_FILE"
+        dput ppa:seann-giffin/dwarfs ../dwarfs_*.changes
+#        CHANGES_FILE=$(ls ../*.changes | head -n1)
+#        dput launchpad "$CHANGES_FILE"
