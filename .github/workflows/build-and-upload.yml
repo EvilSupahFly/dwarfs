@@ -190,7 +190,7 @@ jobs:
       run: |
         dput ppa:seann-giffin/dwarfs ../dwarfs_*.changes
 
-    - name: 16 - Upload to GitHub Releases
+    - name: 16 - Upload Aritifacts to GitHub Releases
       uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.parsed.outputs.tag_no_v }}
