@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 */6 * * *"  # Run every 6 hours
   workflow_dispatch:
+    inputs:
+      use_fake_tag:
+        description: 'Use fake tag for testing?'
+        required: false
+        default: 'false'
 
 jobs:
   sync-and-build:
@@ -27,12 +32,12 @@ jobs:
     - name: 3 - Get latest upstream tag
       id: upstream
       run: |
-        TAG="${{ steps.upstream.outputs.tag }}"
-        if [ "$TAG" = "testing-fake-tag" ]; then
-          git checkout -b update-testing-fake-tag
+        if [[ "${{ github.event.inputs.use_fake_tag }}" == "true" ]]; then
+          echo "tag=testing-fake-tag" >> "$GITHUB_OUTPUT"
         else
-          git fetch upstream tag "$TAG"
-          git checkout -B update-"$TAG" upstream/"$TAG"
+          TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')
+          echo "Detected upstream tag: $TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         fi
 #        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
 #        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
