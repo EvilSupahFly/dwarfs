@@ -132,12 +132,12 @@ EOF
         cat > debian/rules <<EOF
 #!/usr/bin/make -f
 %:
-	dh \$@
+    dh \$@
 override_dh_auto_build:
-	# nothing to build
+    # nothing to build
 override_dh_auto_install:
-	mkdir -p debian/dwarfs/usr/bin
-	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/
+    mkdir -p debian/dwarfs/usr/bin
+    cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/
 EOF
 
     chmod +x debian/rules
