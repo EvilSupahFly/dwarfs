@@ -41,6 +41,15 @@ jobs:
         fi
 #        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
 #        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
+    - name: 3.5 - Resolve actual latest upstream tag
+      id: resolved
+      run: |
+        if [ "${{ steps.upstream.outputs.tag }}" = "testing-fake-tag" ]; then
+          REAL_TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sed 's#refs/tags/##' | sort -V | tail -n1)
+          echo "resolved_tag=$REAL_TAG" >> $GITHUB_OUTPUT
+        else
+          echo "resolved_tag=${{ steps.upstream.outputs.tag }}" >> $GITHUB_OUTPUT
+        fi
     - name: 4 - Check if tag exists locally
       id: checktag
       run: |
@@ -60,7 +69,7 @@ jobs:
 
     - name: 6 - Fetch and checkout new upstream tag
       run: |
-        TAG="${{ steps.upstream.outputs.tag }}"
+        TAG="${{ steps.resolved.outputs.resolved_tag }}"
         git fetch upstream --tags || true
         git checkout -B update-"$TAG" "upstream/$TAG" || git checkout -b update-"$TAG"
 #        git fetch upstream tag ${{ steps.upstream.outputs.tag }}
@@ -78,7 +87,7 @@ jobs:
 
     - name: 10 - Download universal binary and decompress
       run: |
-        URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.upstream.outputs.tag }}/dwarfs-universal-${{ steps.upstream.outputs.tag }}-Linux-x86_64"
+        URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.resolved.outputs.resolved_tag }}/dwarfs-universal-${{ steps.resolved.outputs.resolved_tag }}-Linux-x86_64"
         curl -L "$URL" -o dwarfs
         chmod +x dwarfs
         upx -d dwarfs || echo "Already decompressed"
@@ -90,7 +99,7 @@ jobs:
       run: |
         mkdir build && cd build
         cp -r ../usr ../DEBIAN .
-        tar czf ../dwarfs_${{ steps.upstream.outputs.tag }}.orig.tar.gz usr
+        tar czf ../dwarfs_${{ steps.resolved.outputs.resolved_tag }}.orig.tar.gz usr
         cd ..
         dpkg-source -b .
 
