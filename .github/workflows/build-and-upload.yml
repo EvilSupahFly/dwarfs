@@ -98,7 +98,7 @@ jobs:
     - name: 9 - Install dependencies
       id: parsed
       run: |
-        sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
+        sudo apt update &from the& sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
         TAG="${{ steps.resolved.outputs.resolved_tag }}"
         TAG_NO_V="${TAG#v}"
         echo "tag_no_v=$TAG_NO_V" >> "$GITHUB_OUTPUT"
@@ -121,8 +121,9 @@ jobs:
       run: |
         TAG="${{ steps.resolved.outputs.resolved_tag }}"
         TAG_NO_V="${TAG#v}"
-        echo "Resolved tag is ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
-        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
+        echo "steps.parsed.outputs.resolved_tag = ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
+        echo "steps.parsed.outputs.tag_no_v = ${{ steps.parsed.outputs.tag_no_v }}"
+        echo "TAG_NO_V = $TAG_NO_V"
         cd dwarfs-${TAG_NO_V}
         mkdir debian
         echo "Source: dwarfs" > debian/control
