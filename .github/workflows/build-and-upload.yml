@@ -123,7 +123,7 @@ Build-Depends: debhelper (>= 11)
 
 Package: dwarfs
 Architecture: amd64
-Depends: fuse3, \${misc:Depends}
+Depends: fuse3, \\${misc:Depends}
 Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)
  Precompiled universal binary repackaged as a Debian package.
  Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver.
@@ -132,7 +132,7 @@ EOF
         cat > debian/rules <<EOF
 #!/usr/bin/make -f
 %:
-    dh \$@
+    dh \\$@
 override_dh_auto_build:
     # nothing to build
 override_dh_auto_install:
@@ -141,32 +141,17 @@ override_dh_auto_install:
 EOF
 
     chmod +x debian/rules
-
-    # Changelog
-    dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"
-
-    # Compat (if needed)
-    echo "12" > debian/compat
-#        mkdir build && cd build
-#        mkdir -p dwarfs-${TAG_NO_V}/usr/bin
-#        cp -r ../usr ../DEBIAN .
-#        tar czf ../dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz usr
-#        cd ..
-#        dpkg-source -b .
+    dch --create -v "${TAG_NO_V}" --package dwarfs "New upstream release"    # Changelog
+    echo "12" > debian/compat    # Compat (if needed)
 
     - name: 12 - Build packages
       run: |
         TAG_NO_V="${{ steps.parsed.outputs.tag_no_v }}"
         cd dwarfs-${TAG_NO_V}
 
-        # Create .orig.tar.gz from source dir (excluding debian/)
-        tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
-
-        # Build source package
-        dpkg-source -b .
-
-        # Build binary .deb (for local install or testing)
-        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb
+        tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr        # Create .orig.tar.gz from source dir (excluding debian/)
+        dpkg-source -b .        # Build source package
+        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for local install or testing)
 
     - name: 13 - Import GPG key
       run: |
