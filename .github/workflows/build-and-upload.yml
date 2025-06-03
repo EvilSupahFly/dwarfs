@@ -71,6 +71,7 @@ jobs:
 
     - name: 6 - Fetch and checkout new upstream tag
       run: |
+        echo -e "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
         TAG="${{ steps.resolved.outputs.resolved_tag }}"
         git fetch upstream --tags || true
         git checkout -B update-"$TAG" "upstream/$TAG" || git checkout -b update-"$TAG"
@@ -87,6 +88,7 @@ jobs:
 
     - name: 10 - Download universal binary and decompress
       run: |
+        echo -e "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
         URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.resolved.outputs.resolved_tag }}/dwarfs-universal-${{ steps.resolved.outputs.resolved_tag }}-Linux-x86_64"
         curl -L "$URL" -o dwarfs
         chmod +x dwarfs
@@ -97,6 +99,7 @@ jobs:
 
     - name: 11 - Prepare source package
       run: |
+        echo -e "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
         mkdir build && cd build
         cp -r ../usr ../DEBIAN .
         tar czf ../dwarfs_${{ steps.resolved.outputs.resolved_tag }}.orig.tar.gz usr
