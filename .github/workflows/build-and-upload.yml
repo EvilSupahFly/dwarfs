@@ -160,8 +160,14 @@ jobs:
         cd dwarfs-${TAG_NO_V}
 
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr        # Create .orig.tar.gz from source dir (excluding debian/)
-        dpkg-source -b .        # Build source package
-        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for local install or testing)
+        dpkg-source -b .        # Build source package for Launchpad
+        cd ..
+        mkdir -p build-pkg/DEBIAN
+        cp dwarfs-${TAG_NO_V}/debian/control build-pkg/DEBIAN/control
+        mkdir -p build-pkg/usr/bin
+        cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
+        chmod 755 build-pkg/usr/bin/dwarfs
+        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for GitHub Releases)
 
     - name: 13 - Import GPG key
       run: |
@@ -180,18 +186,19 @@ jobs:
         debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.dsc
         debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.changes
 
-#    - name: 14 - Configure dput
-#      run: |
-#          cat <<EOF > ~/.dput.cf
-#          [launchpad]
-#          fqdn = ppa.launchpad.net
-#          incoming = ~${{ secrets.LAUNCHPAD_USERNAME }}/ubuntu/${{ secrets.LAUNCHPAD_PPA_NAME }}
-#          login = anonymous
-#          method = ftp
-#          EOF
-
     - name: 15 - Upload to Launchpad
       run: |
         dput ppa:seann-giffin/dwarfs ../dwarfs_*.changes
-#        CHANGES_FILE=$(ls ../*.changes | head -n1)
-#        dput launchpad "$CHANGES_FILE"
+
+    - name: 16 - Upload to GitHub Releases
+    uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.parsed.outputs.tag_no_v }}
+        name: DwarFS v${{ steps.parsed.outputs.tag_no_v }}
+        files: |
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}_amd64.deb
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.dsc
+          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.changes
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
