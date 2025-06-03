@@ -13,23 +13,30 @@ jobs:
       DEBIAN_FRONTEND: noninteractive
 
     steps:
-    - name: Checkout your fork
+    - name: 1 - Checkout your fork
       uses: actions/checkout@v4
       with:
         persist-credentials: false
         fetch-depth: 0
 
-    - name: Add upstream remote
+    - name: 2 - Add upstream remote
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
         git fetch upstream --tags
 
-    - name: Get latest upstream tag
+    - name: 3 - Get latest upstream tag
       id: upstream
       run: |
-        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
-        # echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
-    - name: Check if tag exists locally
+        TAG="${{ steps.upstream.outputs.tag }}"
+        if [ "$TAG" = "testing-fake-tag" ]; then
+          git checkout -b update-testing-fake-tag
+        else
+          git fetch upstream tag "$TAG"
+          git checkout -B update-"$TAG" upstream/"$TAG"
+        fi
+#        echo "tag=testing-fake-tag" >> $GITHUB_OUTPUT
+#        echo "tag=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')" >> $GITHUB_OUTPUT
+    - name: 4 - Check if tag exists locally
       id: checktag
       run: |
         if git rev-parse "refs/tags/${{ steps.upstream.outputs.tag }}" >/dev/null 2>&1; then
@@ -39,28 +46,32 @@ jobs:
         fi
         echo "found=false" >> $GITHUB_OUTPUT
 
-    - name: Exit if tag already exists
+    - name: 5 - Exit if tag already exists
       if: steps.checktag.outputs.found == 'true'
       run: |
         echo "No new upstream version. Exiting."
         exit 0
       continue-on-error: false
 
-    - name: Fetch and checkout new upstream tag
+    - name: 6 - Fetch and checkout new upstream tag
       run: |
-        git fetch upstream tag ${{ steps.upstream.outputs.tag }}
-        git checkout -B update-${{ steps.upstream.outputs.tag }} upstream/${{ steps.upstream.outputs.tag }}
-    - name: Remove upstream GitHub workflows
+        TAG="${{ steps.upstream.outputs.tag }}"
+        git fetch upstream --tags || true
+        git checkout -B update-"$TAG" "upstream/$TAG" || git checkout -b update-"$TAG"
+#        git fetch upstream tag ${{ steps.upstream.outputs.tag }}
+#        git checkout -B update-${{ steps.upstream.outputs.tag }} upstream/${{ steps.upstream.outputs.tag }}
+
+    - name: 7 - Remove upstream GitHub workflows
       run: rm -f .github/workflows/*.yml || true
 
-    - name: Copy debian/ directory into working tree
+    - name: 8 - Copy debian/ directory into working tree
       run: |
         git checkout origin/main -- DEBIAN
 
-    - name: Install dependencies
+    - name: 9 - Install dependencies
       run: sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
 
-    - name: Download universal binary and decompress
+    - name: 10 - Download universal binary and decompress
       run: |
         URL="https://github.com/mhx/dwarfs/releases/download/${{ steps.upstream.outputs.tag }}/dwarfs-universal-${{ steps.upstream.outputs.tag }}-Linux-x86_64"
         curl -L "$URL" -o dwarfs
@@ -70,7 +81,7 @@ jobs:
         mv dwarfs usr/bin/dwarfs
         chmod 755 usr/bin/dwarfs
 
-    - name: Prepare source package
+    - name: 11 - Prepare source package
       run: |
         mkdir build && cd build
         cp -r ../usr ../DEBIAN .
@@ -78,7 +89,7 @@ jobs:
         cd ..
         dpkg-source -b .
 
-    - name: Import GPG key
+    - name: 12 - Import GPG key
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
         echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
@@ -89,11 +100,11 @@ jobs:
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
-    - name: Build source package
+    - name: 13 - Build source package
       run: |
         debuild -S -sa --no-lintian -k"$(cat keyid.txt)"
 
-    - name: Configure dput
+    - name: 14 - Configure dput
       run: |
           cat <<EOF > ~/.dput.cf
           [launchpad]
@@ -103,7 +114,7 @@ jobs:
           method = ftp
           EOF
 
-    - name: Upload to Launchpad
+    - name: 15 - Upload to Launchpad
       run: |
         CHANGES_FILE=$(ls ../*.changes | head -n1)
         dput launchpad "$CHANGES_FILE"
