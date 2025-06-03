@@ -167,7 +167,7 @@ jobs:
         mkdir -p build-pkg/usr/bin
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
-        dpkg-deb --build debian/dwarfs ../dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for GitHub Releases)
+        dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for GitHub Releases)
 
     - name: 13 - Import GPG key
       run: |
