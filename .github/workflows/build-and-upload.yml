@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       force_build:
-        description: 'Force build even if no new upstream version?'
+        description: 'Build even if upstream version is unchanged?'
         required: false
         default: 'false'
 
@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEBIAN_FRONTEND: noninteractive
+
+    outputs:
+      tag_no_v: ${{ steps.parse.outputs.tag_no_v }}
 
     steps:
     - name: 1 - Checkout your fork
@@ -25,6 +28,7 @@ jobs:
     - name: 2 - Add upstream remote and fetch tags
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
+        # git submodule update --init
         git fetch upstream --tags
 
     - name: 3 - Determine latest upstream tag
@@ -33,7 +37,7 @@ jobs:
         TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/v[0-9.]*$' | sed 's#refs/tags/##' | sort -V | tail -n1)
         echo "resolved_tag=$TAG" >> "$GITHUB_OUTPUT"
 
-    - name: 4 - Check if tag already exists locally
+    - name: 4 - Check if tag exists locally
       id: check
       run: |
         git fetch --tags
@@ -123,6 +127,7 @@ jobs:
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
         dpkg-source -b .
+        dpkg-genbuildinfo --build=full
         cd ..
         mkdir -p build-pkg/DEBIAN
         echo "Package: dwarfs" > build-pkg/DEBIAN/control
@@ -141,32 +146,56 @@ jobs:
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
 
     - name: 13 - Import GPG key
+      id: import_gpg
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-        echo -e "trust\n5\ny\n" | gpg --command-fd 0 --batch --edit-key "${{ secrets.GPG_KEY_ID }}"
+        KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')
+        echo "Imported GPG key ID: $KEYID"
+        echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
+        echo -e "trust\n5\ny\n" | gpg --command-fd 0 --batch --edit-key "$KEYID"
         echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
         echo RELOADAGENT | gpg-connect-agent
-        echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "${{ secrets.GPG_KEY_ID }}"
+        echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "$KEYID"
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
     - name: 14 - Sign source package
       run: |
-        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign dwarfs_*.dsc
-        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign dwarfs_*.changes
+        debsign -k"${{ steps.import_gpg.outputs.keyid }}" --re-sign dwarfs_*.dsc
+        debsign -k"${{ steps.import_gpg.outputs.keyid }}" --re-sign dwarfs_*.changes
 
     - name: 15 - Upload to Launchpad
       run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
+
+    - name: 15.5 - Extract upstream changelog or fallback
+      id: changelog
+      run: |
+        TAG=v${{ steps.parse.outputs.tag_no_v }}
+        curl -sL https://raw.githubusercontent.com/mhx/dwarfs/main/CHANGES.md -o changes.md || echo "" > changes.md
+        if grep -q "^## $TAG" changes.md; then
+          awk "/^## $TAG/,/^## v/" changes.md | sed '$d' > extracted.txt
+        else
+          git log --pretty=format:"* %s" upstream/${TAG}^..upstream/${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
+        fi
+        {
+          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+          cat extracted.txt >> "$GITHUB_OUTPUT"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
 
     - name: 16 - Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.parse.outputs.tag_no_v }}
         name: DwarFS v${{ steps.parse.outputs.tag_no_v }}
+        body: ${{ steps.changelog.outputs.notes }}
+        draft: false
+        prerelease: false
         files: |
           dwarfs_${{ steps.parse.outputs.tag_no_v }}_amd64.deb
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.orig.tar.gz
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.dsc
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.changes
+          dwarfs_${{ steps.parse.outputs.tag_no_v }}-1_amd64.buildinfo
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
