@@ -17,3 +17,4 @@
 .vs/
 out/
 CMakeSettings.json
+*.old

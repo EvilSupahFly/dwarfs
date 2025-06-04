@@ -2,7 +2,7 @@ name: Sync Upstream and Build .deb
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # Run every 6 hours
+    - cron: "0 */6 * * *"
   workflow_dispatch:
     inputs:
       use_fake_tag:
@@ -13,119 +13,83 @@ on:
 jobs:
   sync-and-build:
     runs-on: ubuntu-latest
-
     env:
       DEBIAN_FRONTEND: noninteractive
+
+    outputs:
+      tag_no_v: ${{ steps.parse.outputs.tag_no_v }}
 
     steps:
     - name: 1 - Checkout your fork
       uses: actions/checkout@v4
       with:
-        persist-credentials: false
         fetch-depth: 0
 
-    - name: 2 - Add upstream remote
+    - name: 2 - Add upstream remote and fetch tags
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
         git fetch upstream --tags
 
-    - name: 3 - Get latest upstream tag
-      id: upstream
+    - name: 3 - Determine latest upstream tag
+      id: resolve_tag
       run: |
         if [[ "${{ github.event.inputs.use_fake_tag }}" == "true" ]]; then
-          echo "tag=testing-fake-tag" >> "$GITHUB_OUTPUT"
+          echo "resolved_tag=testing-fake-tag" >> "$GITHUB_OUTPUT"
         else
-          TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sort -V | tail -n1 | sed 's#refs/tags/##')
-          echo "Detected upstream tag: $TAG"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-        fi
-
-    - name: 3.5 - Resolve actual latest upstream tag
-      id: resolved
-      run: |
-        if [ "${{ steps.upstream.outputs.tag }}" = "testing-fake-tag" ]; then
-          REAL_TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/[^{}]*$' | sed 's#refs/tags/##' | sort -V | tail -n1)
-          echo "resolved_tag=$REAL_TAG" >> $GITHUB_OUTPUT
-        else
-          echo "resolved_tag=${{ steps.upstream.outputs.tag }}" >> $GITHUB_OUTPUT
+          TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/v[0-9.]*$' | sed 's#refs/tags/##' | sort -V | tail -n1)
+          echo "resolved_tag=$TAG" >> "$GITHUB_OUTPUT"
         fi
 
     - name: 4 - Check if tag exists locally
-      id: checktag
+      id: check
       run: |
-        echo "github.event.inputs.use_fake_tag = ${{ github.event.inputs.use_fake_tag }}"
-        echo "steps.upstream.outputs.tag = ${{ steps.upstream.outputs.tag }}"
-        echo "steps.resolved.outputs.resolved_tag = ${{ steps.resolved.outputs.resolved_tag }}"
-        if git rev-parse "refs/tags/${{ steps.resolved.outputs.resolved_tag }}" >/dev/null 2>&1; then
-          echo "found=exists" >> "$GITHUB_OUTPUT"
+        git fetch --tags
+        TAG="${{ steps.resolve_tag.outputs.resolved_tag }}"
+        if [[ "$TAG" != "testing-fake-tag" ]] && git rev-parse "refs/tags/$TAG" >/dev/null 2>&1; then
+          echo "found=true" >> "$GITHUB_OUTPUT"
         else
-          echo "found=missing" >> "$GITHUB_OUTPUT"
+          echo "found=false" >> "$GITHUB_OUTPUT"
         fi
 
-    - name: 4.5 - Debug checktag output
-      run: |
-        echo "github.event.inputs.use_fake_tag = ${{ github.event.inputs.use_fake_tag }}"
-        echo "steps.upstream.outputs.tag = ${{ steps.upstream.outputs.tag }}"
-        echo "steps.resolved.outputs.resolved_tag = ${{ steps.resolved.outputs.resolved_tag }}"
-        echo "steps.checktag.outputs.found = ${{ steps.checktag.outputs.found }}"
-        cat "$GITHUB_OUTPUT"
-
-    - name: 5 - Exit if tag already exists
-      if: steps.checktag.outputs.found == 'exists'
+    - name: 5 - Exit if no new upstream version
+      if: steps.check.outputs.found == 'true' && github.event.inputs.use_fake_tag != 'true'
       run: |
         echo "No new upstream version. Exiting."
         exit 0
-      continue-on-error: false
 
-    - name: 5.5 - Debug fallback
-      if: steps.checktag.outputs.found == ''
-      run: echo "Output was not set properly"
-
-    - name: 6 - Fetch and checkout new upstream tag
+    - name: 6 - Parse tag
+      id: parse
       run: |
-        echo -e "Resolved tag is ${{ steps.resolved.outputs.resolved_tag }}"
-        TAG="${{ steps.resolved.outputs.resolved_tag }}"
-        git fetch upstream --tags || true
-        git checkout -B update-"$TAG" "upstream/$TAG" || git checkout -b update-"$TAG"
+        TAG="${{ steps.resolve_tag.outputs.resolved_tag }}"
+        echo "tag_no_v=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-    - name: 7 - Remove upstream GitHub workflows
+    - name: 7 - Checkout upstream tag
+      run: |
+        git fetch upstream --tags
+        TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
+        git checkout -B build-${TAG} upstream/${TAG}
+
+    - name: 8 - Clean upstream workflows
       run: rm -f .github/workflows/*.yml || true
 
-    - name: 8 - Copy DEBIAN/ directory into working tree
-      run: |
-        git checkout origin/main -- DEBIAN
-
     - name: 9 - Install dependencies
-      id: parsed
-      run: |
-        sudo apt update &from the& sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
-        TAG="${{ steps.resolved.outputs.resolved_tag }}"
-        TAG_NO_V="${TAG#v}"
-        echo "tag_no_v=$TAG_NO_V" >> "$GITHUB_OUTPUT"
+      run: sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
 
-    - name: 10 - Download universal binary and decompress
+    - name: 10 - Download and decompress binary
       run: |
-        TAG="${{ steps.resolved.outputs.resolved_tag }}"
-        TAG_NO_V="${TAG#v}"
-        echo "Resolved tag is ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
-        echo "Parsed tag_no_v is ${{ steps.parsed.outputs.tag_no_v }} and TAG_NO_V is $TAG_NO_V"
-        URL="https://github.com/mhx/dwarfs/releases/download/${TAG}/dwarfs-universal-${TAG_NO_V}-Linux-x86_64"
-        curl -L "$URL" -o dwarfs
+        TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
+        curl -L "https://github.com/mhx/dwarfs/releases/download/${TAG}/dwarfs-universal-${TAG_NO_V}-Linux-x86_64" -o dwarfs
         chmod +x dwarfs
         upx -d dwarfs || echo "Already decompressed"
         mkdir -p dwarfs-${TAG_NO_V}/usr/bin
         mv dwarfs dwarfs-${TAG_NO_V}/usr/bin/dwarfs
-        chmod 755 dwarfs-${TAG_NO_V}/usr/bin/dwarfs
 
-    - name: 11 - Prepare source package
+    - name: 11 - Create Debian packaging files
       run: |
-        TAG="${{ steps.resolved.outputs.resolved_tag }}"
-        TAG_NO_V="${TAG#v}"
-        echo "steps.parsed.outputs.resolved_tag = ${{ steps.parsed.outputs.resolved_tag }} and TAG is $TAG"
-        echo "steps.parsed.outputs.tag_no_v = ${{ steps.parsed.outputs.tag_no_v }}"
-        echo "TAG_NO_V = $TAG_NO_V"
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
-        mkdir debian
+        mkdir -p debian
         echo "Source: dwarfs" > debian/control
         echo "Maintainer: mhx github@mhxnet.de" >> debian/control
         echo "Section: utils" >> debian/control
@@ -139,8 +103,6 @@ jobs:
         echo "Depends: fuse3, \${misc:Depends}" >> debian/control
         echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
         echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
-        echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
-        echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
         echo '#!/usr/bin/make -f' > debian/rules
         echo '%:' >> debian/rules
         echo '	dh $@' >> debian/rules
@@ -150,24 +112,23 @@ jobs:
         echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
         echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
         chmod +x debian/rules
+        echo "12" > debian/compat
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
-        echo "12" > debian/compat
 
-    - name: 12 - Build packages
+    - name: 12 - Build .deb and source
       run: |
-        TAG_NO_V="${{ steps.parsed.outputs.tag_no_v }}"
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
-
-        tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr        # Create .orig.tar.gz from source dir (excluding debian/)
-        dpkg-source -b .        # Build source package for Launchpad
+        tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
+        dpkg-source -b .
         cd ..
         mkdir -p build-pkg/DEBIAN
         cp dwarfs-${TAG_NO_V}/debian/control build-pkg/DEBIAN/control
         mkdir -p build-pkg/usr/bin
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
-        dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb        # Build binary .deb (for GitHub Releases)
+        dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
 
     - name: 13 - Import GPG key
       run: |
@@ -175,30 +136,27 @@ jobs:
         echo -e "trust\n5\ny\n" | gpg --command-fd 0 --batch --edit-key "${{ secrets.GPG_KEY_ID }}"
         echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
         echo RELOADAGENT | gpg-connect-agent
-        KEYID=$(gpg --list-keys --with-colons | awk -F: '/^pub/ {print $5}' | head -n1)
-        echo "$KEYID" > keyid.txt
-        echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "$KEYID"
+        echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "${{ secrets.GPG_KEY_ID }}"
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
-    - name: 14 - Sign Packages
+    - name: 14 - Sign source package
       run: |
-        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.dsc
-        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign ../dwarfs_*.changes
+        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign dwarfs_*.dsc
+        debsign -k"${{ secrets.GPG_KEY_ID }}" --re-sign dwarfs_*.changes
 
     - name: 15 - Upload to Launchpad
-      run: |
-        dput ppa:seann-giffin/dwarfs ../dwarfs_*.changes
+      run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
 
-    - name: 16 - Upload Artifacts to GitHub Releases
+    - name: 16 - Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
       with:
-        tag_name: v${{ steps.parsed.outputs.tag_no_v }}
-        name: DwarFS v${{ steps.parsed.outputs.tag_no_v }}
+        tag_name: v${{ steps.parse.outputs.tag_no_v }}
+        name: DwarFS v${{ steps.parse.outputs.tag_no_v }}
         files: |
-          dwarfs_${{ steps.parsed.outputs.tag_no_v }}_amd64.deb
-          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.orig.tar.gz
-          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.dsc
-          dwarfs_${{ steps.parsed.outputs.tag_no_v }}.changes
+          dwarfs_${{ steps.parse.outputs.tag_no_v }}_amd64.deb
+          dwarfs_${{ steps.parse.outputs.tag_no_v }}.orig.tar.gz
+          dwarfs_${{ steps.parse.outputs.tag_no_v }}.dsc
+          dwarfs_${{ steps.parse.outputs.tag_no_v }}.changes
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
