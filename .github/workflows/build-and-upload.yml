@@ -125,7 +125,16 @@ jobs:
         dpkg-source -b .
         cd ..
         mkdir -p build-pkg/DEBIAN
-        cp dwarfs-${TAG_NO_V}/debian/control build-pkg/DEBIAN/control
+        echo "Package: dwarfs" > build-pkg/DEBIAN/control
+        echo "Version: ${TAG_NO_V}-1" >> build-pkg/DEBIAN/control
+        echo "Section: utils" >> build-pkg/DEBIAN/control
+        echo "Priority: optional" >> build-pkg/DEBIAN/control
+        echo "Architecture: amd64" >> build-pkg/DEBIAN/control
+        echo "Depends: fuse3" >> build-pkg/DEBIAN/control
+        echo "Maintainer: mhx <github@mhxnet.de>" >> build-pkg/DEBIAN/control
+        echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> build-pkg/DEBIAN/control
+        echo " A high-performance read-only file system with built-in compression and deduplication." >> build-pkg/DEBIAN/control
+        echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> build-pkg/DEBIAN/control
         mkdir -p build-pkg/usr/bin
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
