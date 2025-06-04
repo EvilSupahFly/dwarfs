@@ -127,7 +127,6 @@ jobs:
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
         dpkg-source -b .
-        dpkg-genbuildinfo --build=full
         cd ..
         mkdir -p build-pkg/DEBIAN
         echo "Package: dwarfs" > build-pkg/DEBIAN/control
@@ -144,6 +143,8 @@ jobs:
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
+        cd dwarfs-${TAG_NO_V}
+        dpkg-genbuildinfo --build=full
 
     - name: 13 - Import GPG key
       id: import_gpg
