@@ -147,6 +147,12 @@ jobs:
         chmod 755 build-pkg/usr/bin/dwarfs
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
 
+    - name: 12c - Generate .changes file
+      run: |
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
+        cd dwarfs-${TAG_NO_V}
+        dpkg-genchanges -b > ../dwarfs_${TAG_NO_V}.changes
+
     - name: 13 - Import GPG key       # Enable loopback pinentry for non-interactive signing
       id: import_gpg
       run: |
