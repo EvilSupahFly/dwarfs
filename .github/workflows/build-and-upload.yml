@@ -163,7 +163,10 @@ jobs:
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         # Use loopback pinentry to supply passphrase
-        debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
+        # debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
+        for file in dwarfs_*.dsc dwarfs_*.changes; do
+          debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" "$file"
+        done
 
     - name: 15 - Upload to Launchpad
       run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
