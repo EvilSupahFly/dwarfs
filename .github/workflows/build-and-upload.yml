@@ -28,7 +28,6 @@ jobs:
     - name: 2 - Add upstream remote and fetch tags
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
-        # git submodule update --init
         git fetch upstream --tags
 
     - name: 3 - Determine latest upstream tag
@@ -72,7 +71,7 @@ jobs:
         git fetch upstream --tags
         git checkout -B build-${TAG} ${TAG}
 
-    - name: 8 - Clean upstream GitHub workflows
+    - name: 8 - Clean upstream workflows
       run: rm -f .github/workflows/*.yml || true
 
     - name: 9 - Install dependencies
@@ -92,7 +91,7 @@ jobs:
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
-        mkdir -p debian
+        mkdir -p debian/source
         echo "Source: dwarfs" > debian/control
         echo "Maintainer: mhx github@mhxnet.de" >> debian/control
         echo "Section: utils" >> debian/control
@@ -117,6 +116,7 @@ jobs:
         echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
         echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
         chmod +x debian/rules
+        echo "3.0 (native)" > debian/source/format
         echo "12" > debian/compat
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
@@ -127,7 +127,6 @@ jobs:
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
         dpkg-source -b .
-        dpkg-genbuildinfo --build=full   # Let's do the time warp again ... !
         cd ..
         mkdir -p build-pkg/DEBIAN
         echo "Package: dwarfs" > build-pkg/DEBIAN/control
@@ -144,6 +143,7 @@ jobs:
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
+        dpkg-genbuildinfo --build=full
 
     - name: 13 - Import GPG key
       id: import_gpg
@@ -196,6 +196,5 @@ jobs:
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.orig.tar.gz
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.dsc
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.changes
-          dwarfs_${{ steps.parse.outputs.tag_no_v }}-1_amd64.buildinfo
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
