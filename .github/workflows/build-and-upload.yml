@@ -121,13 +121,12 @@ jobs:
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
 
-    - name: 12a - Build source package and generate buildinfo
+    - name: 12a - Build source package
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
         dpkg-source -b .
-        dpkg-genbuildinfo --build=full
 
     - name: 12b - Build binary .deb
       run: |
@@ -147,6 +146,10 @@ jobs:
         cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
         chmod 755 build-pkg/usr/bin/dwarfs
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
+
+    - name: 12c - (Optional) Skip buildinfo
+      run: |
+        echo "Skipping dpkg-genbuildinfo for pure repackaged binary."
 
     - name: 13 - Import GPG key
       id: import_gpg
