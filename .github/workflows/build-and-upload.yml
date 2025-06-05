@@ -116,7 +116,7 @@ jobs:
         echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
         echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
         chmod +x debian/rules
-        echo "3.0 (native)" > debian/source/format
+        echo "3.0 (quilt)" > debian/source/format
         echo "12" > debian/compat
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
