@@ -147,28 +147,23 @@ jobs:
         chmod 755 build-pkg/usr/bin/dwarfs
         dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
 
-    - name: 12c - (Optional) Skip buildinfo
-      run: |
-        echo "Skipping dpkg-genbuildinfo for pure repackaged binary."
-
-    - name: 13 - Import GPG key
+    - name: 13 - Import GPG key       # Enable loopback pinentry for non-interactive signing
       id: import_gpg
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+        echo RELOADAGENT | gpg-connect-agent
         KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')
         echo "Imported GPG key ID: $KEYID"
         echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
-        echo -e "trust\n5\ny\n" | gpg --command-fd 0 --batch --edit-key "$KEYID"
-        echo "allow-preset-passphrase" >> ~/.gnupg/gpg-agent.conf
-        echo RELOADAGENT | gpg-connect-agent
-        echo "${{ secrets.GPG_PASSPHRASE }}" | /usr/lib/gnupg/gpg-preset-passphrase --preset "$KEYID"
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
     - name: 14 - Sign source package
       run: |
-        debsign -k"${{ steps.import_gpg.outputs.keyid }}" --re-sign dwarfs_*.dsc
-        debsign -k"${{ steps.import_gpg.outputs.keyid }}" --re-sign dwarfs_*.changes
+        KEYID=${{ steps.import_gpg.outputs.keyid }}
+        # Use loopback pinentry to supply passphrase
+        debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
 
     - name: 15 - Upload to Launchpad
       run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
