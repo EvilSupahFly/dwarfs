@@ -151,8 +151,13 @@ jobs:
       id: import_gpg
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+
+        # Correct pinentry configuration
+        mkdir -p ~/.gnupg
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
         echo RELOADAGENT | gpg-connect-agent
+
+        # Extract and output key ID
         KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')
         echo "Imported GPG key ID: $KEYID"
         echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
@@ -172,11 +177,12 @@ jobs:
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         export GPG_TTY=$(tty)
-        echo "$KEYID:6:${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback --import-ownertrust
+
         for file in dwarfs_*.dsc dwarfs_*.changes; do
-          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-            --default-key "$KEYID" --output "$file.gpg" --detach-sign "$file"
-          mv "$file.gpg" "${file%.dsc}.dsc.asc" 2>/dev/null || mv "$file.gpg" "${file%.changes}.changes.asc"
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+              --local-user "$KEYID" \
+              --output "$file.asc" --detach-sign "$file"
         done
 
     - name: 15 - Upload to Launchpad
