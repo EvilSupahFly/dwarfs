@@ -159,13 +159,24 @@ jobs:
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
+#    - name: 14 - Sign source package
+#      run: |
+#        KEYID=${{ steps.import_gpg.outputs.keyid }}
+#        # Use loopback pinentry to supply passphrase
+#        # debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
+#        for file in dwarfs_*.dsc dwarfs_*.changes; do
+#          debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" "$file"
+#        done
+
     - name: 14 - Sign source package
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
-        # Use loopback pinentry to supply passphrase
-        # debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
+        export GPG_TTY=$(tty)
+        echo "$KEYID:6:${{ secrets.GPG_PASSPHRASE }}" | gpg --batch --yes --passphrase-fd 0 --pinentry-mode loopback --import-ownertrust
         for file in dwarfs_*.dsc dwarfs_*.changes; do
-          debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" "$file"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --default-key "$KEYID" --output "$file.gpg" --detach-sign "$file"
+          mv "$file.gpg" "${file%.dsc}.dsc.asc" 2>/dev/null || mv "$file.gpg" "${file%.changes}.changes.asc"
         done
 
     - name: 15 - Upload to Launchpad
