@@ -105,6 +105,10 @@ jobs:
         echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
         echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
         echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
+        echo '#!/usr/bin/make -f' > debian/rules
+        echo '%:' >> debian/rules
+        echo '	dh $@' >> debian/rules
+        chmod +x debian/rules
         echo "3.0 (native)" > debian/source/format
         echo "12" > debian/compat
         export DEBEMAIL="github@mhxnet.de"
