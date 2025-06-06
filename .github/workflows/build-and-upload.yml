@@ -92,25 +92,32 @@ jobs:
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         mkdir -p debian/source
+
+        # Source stanza
         echo "Source: dwarfs" > debian/control
-        echo "Maintainer: mhx github@mhxnet.de" >> debian/control
+        echo "Maintainer: mhx <github@mhxnet.de>" >> debian/control
         echo "Section: utils" >> debian/control
         echo "Priority: optional" >> debian/control
         echo "Standards-Version: 4.5.0" >> debian/control
+        echo "Build-Depends: debhelper (>= 11)" >> debian/control
+        echo "" >> debian/control
+
+        # Binary stanza
         echo "Package: dwarfs" >> debian/control
-        echo "Version: ${TAG_NO_V}-1" >> debian/control
         echo "Architecture: amd64" >> debian/control
         echo "Depends: fuse3, \${misc:Depends}" >> debian/control
         echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
         echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
-        echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
         echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
+
         echo '#!/usr/bin/make -f' > debian/rules
         echo '%:' >> debian/rules
         echo '	dh $@' >> debian/rules
         chmod +x debian/rules
+
         echo "3.0 (native)" > debian/source/format
         echo "12" > debian/compat
+
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
         cd ..
