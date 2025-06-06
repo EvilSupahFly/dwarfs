@@ -91,7 +91,7 @@ jobs:
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
-        mkdir -p debian
+        mkdir -p debian/source
         echo "Source: dwarfs" > debian/control
         echo "Maintainer: mhx github@mhxnet.de" >> debian/control
         echo "Section: utils" >> debian/control
