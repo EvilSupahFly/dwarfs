@@ -80,7 +80,7 @@ jobs:
     - name: 10 - Download and decompress binary
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
-        TAG_NO_V="${TAG#v}"
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         curl -L "https://github.com/mhx/dwarfs/releases/download/${TAG}/dwarfs-universal-${TAG_NO_V}-Linux-x86_64" -o dwarfs
         chmod +x dwarfs
         upx -d dwarfs || echo "Already decompressed"
@@ -91,14 +91,12 @@ jobs:
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
-        mkdir -p debian/source
+        mkdir -p debian
         echo "Source: dwarfs" > debian/control
         echo "Maintainer: mhx github@mhxnet.de" >> debian/control
         echo "Section: utils" >> debian/control
         echo "Priority: optional" >> debian/control
         echo "Standards-Version: 4.5.0" >> debian/control
-        echo "Build-Depends: debhelper (>= 11)" >> debian/control
-        echo "" >> debian/control
         echo "Package: dwarfs" >> debian/control
         echo "Version: ${TAG_NO_V}-1" >> debian/control
         echo "Architecture: amd64" >> debian/control
@@ -107,92 +105,44 @@ jobs:
         echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
         echo " Precompiled universal binary repackaged as a Debian package." >> debian/control
         echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
-        echo '#!/usr/bin/make -f' > debian/rules
-        echo '%:' >> debian/rules
-        echo '	dh $@' >> debian/rules
-        echo 'override_dh_auto_build:' >> debian/rules
-        echo '	# nothing to build' >> debian/rules
-        echo 'override_dh_auto_install:' >> debian/rules
-        echo '	mkdir -p debian/dwarfs/usr/bin' >> debian/rules
-        echo '	cp -a usr/bin/dwarfs debian/dwarfs/usr/bin/' >> debian/rules
-        chmod +x debian/rules
-        echo "3.0 (quilt)" > debian/source/format
+        echo "3.0 (native)" > debian/source/format
         echo "12" > debian/compat
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
+        cd ..
 
-    - name: 12a - Build source package
+    - name: 12 - Build .deb and source package
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
-        dpkg-source -b .
+        debuild -us -uc -b
 
-    - name: 12b - Build binary .deb
-      run: |
-        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
-        mkdir -p build-pkg/DEBIAN
-        echo "Package: dwarfs" > build-pkg/DEBIAN/control
-        echo "Version: ${TAG_NO_V}-1" >> build-pkg/DEBIAN/control
-        echo "Section: utils" >> build-pkg/DEBIAN/control
-        echo "Priority: optional" >> build-pkg/DEBIAN/control
-        echo "Architecture: amd64" >> build-pkg/DEBIAN/control
-        echo "Depends: fuse3" >> build-pkg/DEBIAN/control
-        echo "Maintainer: mhx <github@mhxnet.de>" >> build-pkg/DEBIAN/control
-        echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> build-pkg/DEBIAN/control
-        echo " A high-performance read-only file system with built-in compression and deduplication." >> build-pkg/DEBIAN/control
-        echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> build-pkg/DEBIAN/control
-        mkdir -p build-pkg/usr/bin
-        cp dwarfs-${TAG_NO_V}/usr/bin/dwarfs build-pkg/usr/bin/
-        chmod 755 build-pkg/usr/bin/dwarfs
-        dpkg-deb --build build-pkg dwarfs_${TAG_NO_V}_amd64.deb
-
-    - name: 12c - Generate .changes file
-      run: |
-        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
-        cd dwarfs-${TAG_NO_V}
-        dpkg-genchanges -b > ../dwarfs_${TAG_NO_V}.changes
-
-    - name: 13 - Import GPG key       # Enable loopback pinentry for non-interactive signing
+    - name: 13 - Import GPG key
       id: import_gpg
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-
-        # Correct pinentry configuration
-        mkdir -p ~/.gnupg
-        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
         echo RELOADAGENT | gpg-connect-agent
-
-        # Extract and output key ID
         KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')
         echo "Imported GPG key ID: $KEYID"
         echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
-#    - name: 14 - Sign source package
-#      run: |
-#        KEYID=${{ steps.import_gpg.outputs.keyid }}
-#        # Use loopback pinentry to supply passphrase
-#        # debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" dwarfs_*.changes
-#        for file in dwarfs_*.dsc dwarfs_*.changes; do
-#          debsign -p "-u $KEYID --pinentry-mode loopback --passphrase '${{ secrets.GPG_PASSPHRASE }}'" "$file"
-#        done
-
     - name: 14 - Sign source package
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         export GPG_TTY=$(tty)
-
         for file in dwarfs_*.dsc dwarfs_*.changes; do
           gpg --batch --yes --pinentry-mode loopback \
               --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-              --local-user "$KEYID" \
+              --default-key "$KEYID" \
               --output "$file.asc" --detach-sign "$file"
         done
 
     - name: 15 - Upload to Launchpad
-      run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
+      run: dput ppa:seann-grifftsdwarfs dwarfs_*.changes
 
     - name: 15.5 - Extract upstream changelog or fallback
       id: changelog
@@ -202,20 +152,40 @@ jobs:
         if grep -q "^## $TAG" changes.md; then
           awk "/^## $TAG/,/^## v/" changes.md | sed '$d' > extracted.txt
         else
-          git log --pretty=format:"* %s" upstream/${TAG}^..upstream/${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
+          git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
         fi
-        {
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          cat extracted.txt >> "$GITHUB_OUTPUT"
-          echo "EOF"
-        } >> "$GITHUB_OUTPUT"
+        echo "notes<<EOF" >> "$GITHUB_OUTPUT"
+        cat extracted.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
+
+    - name: 15.8 - Generate and sign SHA256 checksums
+      id: checksums
+      run: |
+        TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
+        sha256sum dwarfs_${TAG_NO_V}_amd64.deb \
+                  dwarfs_${TAG_NO_V}.orig.tar.gz \
+                  dwarfs_${TAG_NO_V}.dsc \
+                  dwarfs_${TAG_NO_V}.changes > checksums.txt
+        gpg --batch --yes --pinentry-mode loopback \
+            --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+            --default-key "${{ steps.import_gpg.outputs.keyid }}" \
+            --output checksums.txt.asc --detach-sign checksums.txt
+        echo "checksums<<EOF" >> "$GITHUB_OUTPUT"
+        cat checksums.txt >> "$GITHUB_OUTPUT"
+        echo "EOF" >> "$GITHUB_OUTPUT"
 
     - name: 16 - Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.parse.outputs.tag_no_v }}
         name: DwarFS v${{ steps.parse.outputs.tag_no_v }}
-        body: ${{ steps.changelog.outputs.notes }}
+        body: |
+          ${{ steps.changelog.outputs.notes }}
+
+          ## SHA256 Checksums
+          ```
+          ${{ steps.checksums.outputs.checksums }}
+          ```
         draft: false
         prerelease: false
         files: |
@@ -223,5 +193,7 @@ jobs:
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.orig.tar.gz
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.dsc
           dwarfs_${{ steps.parse.outputs.tag_no_v }}.changes
+          checksums.txt
+          checksums.txt.asc
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
