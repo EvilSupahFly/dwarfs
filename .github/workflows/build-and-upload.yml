@@ -150,60 +150,56 @@ jobs:
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
 
         # Create orig tarball
-        echo "tar czf dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform=\"s,^,dwarfs-${TAG_NO_V}/,\" dwarfs-${TAG_NO_V}/usr"
         tar czf dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," dwarfs-${TAG_NO_V}/usr
 
         # Binary build
-        echo "cp -r dwarfs-${TAG_NO_V} build-bin"
         cp -r dwarfs-${TAG_NO_V} build-bin
-        echo "cd build-bin"
         cd build-bin
-        echo "debuild -b -us -uc -d"
         debuild -b -us -uc -d
-        echo "cd .."
         cd ..
 
         # Source build
-        echo "cp -r dwarfs-${TAG_NO_V} build-src"
         cp -r dwarfs-${TAG_NO_V} build-src
-        echo "cd build-src"
         cd build-src
-        echo "debuild -S -us -uc -d"
         debuild -S -us -uc -d
-        echo "cd .."
         cd ..
 
         # Sign .dsc and .changes files
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         for f in dwarfs_*_amd64.changes dwarfs_*_source.changes; do
-          echo "[ -e \"$f\" ] && debsign -k\"$KEYID\" \"$f\""
           [ -e "$f" ] && debsign -k"$KEYID" "$f"
         done
       shell: bash
-    - name: 14 - Sign source package
+
+    #- name: 14 - Sign source package
+    #  if: steps.decision.outputs.should_build == 'true'
+    #  run: |
+    #    KEYID=${{ steps.import_gpg.outputs.keyid }}
+    #    export GPG_TTY=$(tty)
+    #    shopt -s nullglob
+    #    files=(dwarfs_*.dsc dwarfs_*.changes)
+    #    if [ ${#files[@]} -eq 0 ]; then
+    #      echo "No files to sign"
+    #      exit 0
+    #    fi
+    #    for file in "${files[@]}"; do
+    #       echo "Signing \"$file\""
+    #        gpg --batch --yes --pinentry-mode loopback \
+    #          --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
+    #          --default-key "$KEYID" \
+    #          --output "$file.asc" --detach-sign "$file"
+    #        echo "\"$file\" signed successfully"
+    #   done
+    #  shell: bash
+
+    - name: 14 - Upload to Launchpad
       if: steps.decision.outputs.should_build == 'true'
       run: |
-        KEYID=${{ steps.import_gpg.outputs.keyid }}
-        export GPG_TTY=$(tty)
-        shopt -s nullglob
-        files=(dwarfs_*.dsc dwarfs_*.changes)
-        if [ ${#files[@]} -eq 0 ]; then
-          echo "No files to sign"
-          exit 0
-        fi
-        for file in "${files[@]}"; do
-          gpg --batch --yes --pinentry-mode loopback \
-              --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-              --default-key "$KEYID" \
-              --output "$file.asc" --detach-sign "$file"
-        done
+        echo "running: dput ppa:seann-giffin/dwarfs dwarfs_*.changes"
+        dput ppa:seann-giffin/dwarfs dwarfs_*.changes
       shell: bash
 
-    - name: 15 - Upload to Launchpad
-      if: steps.decision.outputs.should_build == 'true'
-      run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
-
-    - name: 15.5 - Extract upstream changelog or fallback
+    - name: 15 - Extract upstream changelog or fallback
       if: steps.decision.outputs.should_build == 'true'
       id: changelog
       run: |
@@ -218,7 +214,7 @@ jobs:
         cat extracted.txt >> "$GITHUB_OUTPUT"
         echo "EOF" >> "$GITHUB_OUTPUT"
 
-    - name: 15.8 - Generate and sign SHA256 checksums
+    - name: 15.5 - Generate and sign SHA256 checksums
       if: steps.decision.outputs.should_build == 'true'
       id: checksums
       run: |
