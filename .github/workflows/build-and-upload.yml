@@ -47,37 +47,45 @@ jobs:
           echo "found=false" >> "$GITHUB_OUTPUT"
         fi
 
+    - name: 4.5 - Set build decision
+      id: decision
+      run: |
+        if [ "${{ steps.check.outputs.found }}" != "true" ] || [ "${{ github.event.inputs.force_build }}" == "true" ]; then
+          echo "should_build=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "should_build=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: 5 - Exit if no new upstream version
-      if: steps.check.outputs.found == 'true' && github.event.inputs.force_build != 'true'
+      if: steps.decision.outputs.should_build == 'false'
       run: |
         echo "No new upstream version. Exiting."
         exit 0
 
-    - name: 5.5 - Info
-      run: |
-        if [[ "${{ github.event.inputs.force_build }}" == "true" ]]; then
-          echo "::notice title=Test Build::Test build enabled. Running full build."
-        fi
-
     - name: 6 - Parse tag
       id: parse
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG="${{ steps.resolve_tag.outputs.resolved_tag }}"
         echo "tag_no_v=${TAG#v}" >> "$GITHUB_OUTPUT"
 
     - name: 7 - Checkout upstream tag
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         git fetch upstream --tags
-        git checkout -B build-${TAG} ${TAG}
+        git checkout -B build-${TAG} upstream/${TAG}
 
     - name: 8 - Clean upstream workflows
+      if: steps.decision.outputs.should_build == 'true'
       run: rm -f .github/workflows/*.yml || true
 
     - name: 9 - Install dependencies
+      if: steps.decision.outputs.should_build == 'true'
       run: sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
 
     - name: 10 - Download and decompress binary
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
@@ -88,6 +96,7 @@ jobs:
         mv dwarfs dwarfs-${TAG_NO_V}/usr/bin/dwarfs
 
     - name: 11 - Create Debian packaging files
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
@@ -123,17 +132,19 @@ jobs:
         cd ..
 
     - name: 12 - Build .deb and source package
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
-        debuild -us -uc -b -d
+        debuild -us -uc -b
 
     - name: 13 - Import GPG key
+      if: steps.decision.outputs.should_build == 'true'
       id: import_gpg
       run: |
         echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
-        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg.conf
+        echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
         echo RELOADAGENT | gpg-connect-agent
         KEYID=$(gpg --list-secret-keys --with-colons | awk -F: '/^sec/ { print $5; exit }')
         echo "Imported GPG key ID: $KEYID"
@@ -142,6 +153,7 @@ jobs:
         GPG_TTY: ${{ runner.env.TERM }}
 
     - name: 14 - Sign source package
+      if: steps.decision.outputs.should_build == 'true'
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         export GPG_TTY=$(tty)
@@ -153,9 +165,11 @@ jobs:
         done
 
     - name: 15 - Upload to Launchpad
-      run: dput ppa:seann-grifftsdwarfs dwarfs_*.changes
+      if: steps.decision.outputs.should_build == 'true'
+      run: dput ppa:seann-giffin/dwarfs dwarfs_*.changes
 
     - name: 15.5 - Extract upstream changelog or fallback
+      if: steps.decision.outputs.should_build == 'true'
       id: changelog
       run: |
         TAG=v${{ steps.parse.outputs.tag_no_v }}
@@ -170,6 +184,7 @@ jobs:
         echo "EOF" >> "$GITHUB_OUTPUT"
 
     - name: 15.8 - Generate and sign SHA256 checksums
+      if: steps.decision.outputs.should_build == 'true'
       id: checksums
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
@@ -186,6 +201,7 @@ jobs:
         echo "EOF" >> "$GITHUB_OUTPUT"
 
     - name: 16 - Upload to GitHub Releases
+      if: steps.decision.outputs.should_build == 'true'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: v${{ steps.parse.outputs.tag_no_v }}
