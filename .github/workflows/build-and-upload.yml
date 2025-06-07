@@ -211,8 +211,8 @@ jobs:
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
         fi
         {
-          echo "notes<<EOF" >> "$GITHUB_OUTPUT"
-          cat extracted.txt >> "$GITHUB_OUTPUT"
+          echo "notes<<EOF"
+          cat extracted.txt
           echo "EOF"
         } >> "$GITHUB_OUTPUT"
 
