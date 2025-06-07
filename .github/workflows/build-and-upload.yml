@@ -142,7 +142,9 @@ jobs:
         # Sign .dsc and .changes files
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         debsign -k"$KEYID" ../dwarfs_${TAG_NO_V}.dsc
+        echo "debsign -k\"[[REDACTED]]\" ../dwarfs_${TAG_NO_V}.dsc"
         debsign -k"$KEYID" ../dwarfs_${TAG_NO_V}_source.changes || debsign -k"$KEYID" ../dwarfs_${TAG_NO_V}.changes
+        echo "debsign -k\"[[REDACTED]]\" ../dwarfs_${TAG_NO_V}_source.changes || debsign -k\"[[REDACTED]]\" ../dwarfs_${TAG_NO_V}.changes"
 
     - name: 13 - Import GPG key
       if: steps.decision.outputs.should_build == 'true'
