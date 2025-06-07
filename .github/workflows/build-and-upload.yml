@@ -157,12 +157,19 @@ jobs:
       run: |
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         export GPG_TTY=$(tty)
-        for file in dwarfs_*.dsc dwarfs_*.changes; do
+        shopt -s nullglob
+        files=(dwarfs_*.dsc dwarfs_*.changes)
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No files to sign"
+          exit 0
+        fi
+        for file in "${files[@]}"; do
           gpg --batch --yes --pinentry-mode loopback \
               --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
               --default-key "$KEYID" \
               --output "$file.asc" --detach-sign "$file"
         done
+      shell: bash
 
     - name: 15 - Upload to Launchpad
       if: steps.decision.outputs.should_build == 'true'
