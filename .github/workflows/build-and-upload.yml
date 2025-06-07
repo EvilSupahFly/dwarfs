@@ -141,8 +141,10 @@ jobs:
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
         echo "debuild -b -us -uc -d"
         debuild -b -us -uc -d
-        echo "cd ..""
-        cd ..
+        echo "debuild -b -us -uc -d"
+        debuild -S -us -uc -d
+        echo "cd .. && ls -l""
+        cd .. && ls -l
         # Sign .dsc and .changes files
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         echo "debsign -k\"[[REDACTED]]\" ../dwarfs_${TAG_NO_V}.changes"
