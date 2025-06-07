@@ -149,26 +149,38 @@ jobs:
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
+        echo "tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform=\"s,^,dwarfs-${TAG_NO_V}/,\" usr"
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
 
         # Binary build
+        echo "cp -r dwarfs-${TAG_NO_V} build-bin"
         cp -r dwarfs-${TAG_NO_V} build-bin
+        echo "cd build-bin"
         cd build-bin
+        echo "debuild -b -us -uc -d"
         debuild -b -us -uc -d 
+        echo "cd .."
         cd ..
 
         # Source build
+        echo "cp -r dwarfs-${TAG_NO_V} build-src"
         cp -r dwarfs-${TAG_NO_V} build-src
+        echo "cd build-src"
         cd build-src
+        echo "debuild -S -us -uc -d"
         debuild -S -us -uc -d
+        echo "cd ..""
         cd ..
 
         # Sign .dsc and .changes files
         KEYID=${{ steps.import_gpg.outputs.keyid }}
         ls -l
+        echo "for f in dwarfs_*_amd64.changes dwarfs_*_source.changes; do"
         for f in dwarfs_*_amd64.changes dwarfs_*_source.changes; do
+          echo "[ -e \"$f\" ] && debsign -k\"$KEYID\" \"$\f\""
           [ -e "$f" ] && debsign -k"$KEYID" "$f"
         done
+        echo "done"
       shell: bash
 
     - name: 14 - Sign source package
