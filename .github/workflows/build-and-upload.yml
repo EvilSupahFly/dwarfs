@@ -137,7 +137,12 @@ jobs:
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
-        debuild -us -uc -b -d
+        debuild -b -us -uc -d
+        cd ..
+        # Sign .dsc and .changes files
+        KEYID=${{ steps.import_gpg.outputs.keyid }}
+        debsign -k"$KEYID" dwarfs_${TAG_NO_V}.dsc
+        debsign -k"$KEYID" dwarfs_${TAG_NO_V}_source.changes || debsign -k"$KEYID" dwarfs_${TAG_NO_V}.changes
 
     - name: 13 - Import GPG key
       if: steps.decision.outputs.should_build == 'true'
