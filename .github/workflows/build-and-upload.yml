@@ -137,7 +137,7 @@ jobs:
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         cd dwarfs-${TAG_NO_V}
         tar czf ../dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," usr
-        debuild -us -uc -b
+        debuild -us -uc -b -d
 
     - name: 13 - Import GPG key
       if: steps.decision.outputs.should_build == 'true'
