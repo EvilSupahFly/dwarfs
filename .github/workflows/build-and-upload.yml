@@ -74,7 +74,7 @@ jobs:
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         git fetch upstream --tags
-        git checkout -B build-${TAG} upstream/${TAG}
+        git checkout -B build-${TAG} ${TAG}
 
     - name: 8 - Clean upstream workflows
       if: steps.decision.outputs.should_build == 'true'
