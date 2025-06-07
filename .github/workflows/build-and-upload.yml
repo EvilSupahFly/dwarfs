@@ -128,7 +128,7 @@ jobs:
         echo "12" > debian/compat
 
         export DEBEMAIL="github@mhxnet.de"
-        dch --create -v "${TAG_NO_V}-1" --package dwarfs "New upstream release"
+        dch --create -v "${TAG_NO_V}-1" --package dwarfs -D noble "Upstream release of dwarfs ${TAG_NO_V}"
         cd ..
 
     - name: 12 - Import GPG key
