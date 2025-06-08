@@ -211,9 +211,9 @@ jobs:
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
         fi
         {
-          echo "notes<<EOF"
+          echo "notes<<END_OF_CHANGELOG"
           cat extracted.txt
-          echo "EOF"
+          echo "END_OF_CHANGELOG"
         } >> "$GITHUB_OUTPUT"
 
     - name: 15.5 - Generate and sign SHA256 checksums
@@ -229,9 +229,11 @@ jobs:
             --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             --default-key "${{ steps.import_gpg.outputs.keyid }}" \
             --output checksums.txt.asc --detach-sign checksums.txt
-        echo "checksums<<EOF" >> "$GITHUB_OUTPUT"
-        cat checksums.txt >> "$GITHUB_OUTPUT"
-        echo "EOF" >> "$GITHUB_OUTPUT"
+        {
+          echo "checksums<<EOF"
+          cat checksums.txt
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
 
     - name: 16 - Upload to GitHub Releases
       if: steps.decision.outputs.should_build == 'true'
