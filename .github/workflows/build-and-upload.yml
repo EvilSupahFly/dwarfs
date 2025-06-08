@@ -192,7 +192,7 @@ jobs:
       id: changelog
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
-        END_CHANGELOG="END_CHANGELOG_$(uuidgen 2>/dev/null || date +%s%N)"
+        END_CHANGELOG="7bf5371d-4396-41f6-bb3f-56a6d93356f4"  # Unique delimiter to avoid conflicts
         echo "END_CHANGELOG=$END_CHANGELOG"
         curl -sL https://raw.githubusercontent.com/mhx/dwarfs/main/CHANGES.md -o changes.md || echo "" > changes.md
         if grep -q "^## $TAG" changes.md; then
@@ -231,8 +231,8 @@ jobs:
             --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             --default-key "${{ steps.import_gpg.outputs.keyid }}" \
             --output checksums.txt.asc --detach-sign checksums.txt
-        END_CHECKSUMS="END_CHECKSUMS_$(uuidgen 2>/dev/null || date +%s%N)"
-        if grep -q "$END_HECKSUMS" extracted.txt; then
+        END_CHECKSUMS="5e0ae492-59c5-4061-9d31-539f54e8cd14"  # Unique delimiter to avoid conflicts
+        if grep -q "$END_CHECKSUMS" extracted.txt; then
           echo "Error: Delimiter $END_CHECKSUMS found in checksum output!" >&2
           exit 1
         fi
