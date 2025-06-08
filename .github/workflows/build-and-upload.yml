@@ -18,6 +18,7 @@ jobs:
 
     outputs:
       tag_no_v: ${{ steps.parse.outputs.tag_no_v }}
+      tag: ${{ steps.resolve_tag.outputs.resolved_tag }}
 
     steps:
     - name: 1 - Checkout your fork
@@ -29,12 +30,14 @@ jobs:
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
         git fetch upstream --tags
+      shell: bash
 
     - name: 3 - Determine latest upstream tag
       id: resolve_tag
       run: |
         TAG=$(git ls-remote --tags upstream | grep -o 'refs/tags/v[0-9.]*$' | sed 's#refs/tags/##' | sort -V | tail -n1)
         echo "resolved_tag=$TAG" >> "$GITHUB_OUTPUT"
+      shell: bash
 
     - name: 4 - Check if tag exists locally
       id: check
@@ -46,6 +49,7 @@ jobs:
         else
           echo "found=false" >> "$GITHUB_OUTPUT"
         fi
+      shell: bash
 
     - name: 4.5 - Set build decision
       id: decision
@@ -55,12 +59,14 @@ jobs:
         else
           echo "should_build=false" >> "$GITHUB_OUTPUT"
         fi
+      shell: bash
 
     - name: 5 - Exit if no new upstream version
       if: steps.decision.outputs.should_build == 'false'
       run: |
         echo "No new upstream version. Exiting."
         exit 0
+      shell: bash
 
     - name: 6 - Parse tag
       id: parse
@@ -68,6 +74,7 @@ jobs:
       run: |
         TAG="${{ steps.resolve_tag.outputs.resolved_tag }}"
         echo "tag_no_v=${TAG#v}" >> "$GITHUB_OUTPUT"
+      shell: bash
 
     - name: 7 - Checkout upstream tag
       if: steps.decision.outputs.should_build == 'true'
@@ -75,14 +82,17 @@ jobs:
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         git fetch upstream --tags
         git checkout -B build-${TAG} ${TAG}
+      shell: bash
 
     - name: 8 - Clean upstream workflows
       if: steps.decision.outputs.should_build == 'true'
       run: rm -f .github/workflows/*.yml || true
+      shell: bash
 
     - name: 9 - Install dependencies
       if: steps.decision.outputs.should_build == 'true'
       run: sudo apt update && sudo apt install -y devscripts debhelper dpkg-dev gnupg dput upx
+      shell: bash
 
     - name: 10 - Download and decompress binary
       if: steps.decision.outputs.should_build == 'true'
@@ -94,6 +104,7 @@ jobs:
         upx -d dwarfs || echo "Already decompressed"
         mkdir -p dwarfs-${TAG_NO_V}/usr/bin
         mv dwarfs dwarfs-${TAG_NO_V}/usr/bin/dwarfs
+      shell: bash
 
     - name: 11 - Create Debian packaging files
       if: steps.decision.outputs.should_build == 'true'
@@ -131,6 +142,7 @@ jobs:
         export DEBEMAIL="github@mhxnet.de"
         dch --create -v "${TAG_NO_V}-1" --package dwarfs -D noble "Upstream release of dwarfs ${TAG_NO_V}"
         cd ..
+      shell: bash
 
     - name: 12 - Import GPG key
       if: steps.decision.outputs.should_build == 'true'
@@ -144,6 +156,7 @@ jobs:
         echo "keyid=$KEYID" >> "$GITHUB_OUTPUT"
       env:
         GPG_TTY: ${{ runner.env.TERM }}
+      shell: bash
 
     - name: 13 - Build and sign .deb and source for Launchpad
       if: steps.decision.outputs.should_build == 'true'
@@ -204,24 +217,26 @@ jobs:
       if: steps.decision.outputs.should_build == 'true'
       id: changelog
       run: |
-        TAG=v${{ steps.parse.outputs.tag_no_v }}
+        TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         curl -sL https://raw.githubusercontent.com/mhx/dwarfs/main/CHANGES.md -o changes.md || echo "" > changes.md
         if grep -q "^## $TAG" changes.md; then
           awk "/^## $TAG/,/^## v/" changes.md | sed '$d' > extracted.txt
         else
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
         fi
-        END_CHANGELOG="EOF_CHANGELOG_${TAG}"
+        END_CHANGELOG="EOF_${TAG}_CHANGELOG"
         {
-          echo "notes<<${END_CHANGELOG}"
+          echo "notes<<$END_CHANGELOG"
           cat extracted.txt
           echo "$END_CHANGELOG"
         } >> "$GITHUB_OUTPUT"
+      shell: bash
 
     - name: 15.5 - Generate and sign SHA256 checksums
       if: steps.decision.outputs.should_build == 'true'
       id: checksums
       run: |
+        TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
         sha256sum dwarfs_${TAG_NO_V}_amd64.deb \
                   dwarfs_${TAG_NO_V}.orig.tar.gz \
@@ -231,12 +246,13 @@ jobs:
             --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
             --default-key "${{ steps.import_gpg.outputs.keyid }}" \
             --output checksums.txt.asc --detach-sign checksums.txt
-        END_CHECKSUMS="EOF_CHECKSUMS_${TAG_NO_V}"
+        END_CHECKSUMS="EOF_${TAG}_CHECKSUMS"
          {
-          echo "checksums<<${END_CHECKSUMS}"
+          echo "checksums<<$END_CHECKSUMS"
           cat checksums.txt
-          echo "${END_CHECKSUMS}"
+          echo "$END_CHECKSUMS"
         } >> "$GITHUB_OUTPUT"
+      shell: bash
 
     - name: 16 - Upload to GitHub Releases
       if: steps.decision.outputs.should_build == 'true'
