@@ -206,34 +206,37 @@ jobs:
     #   done
     #  shell: bash
 
-    - name: 14 - Upload everything to Launchpad
-      if: steps.decision.outputs.should_build == 'true'
-      run: |
-        echo "running: dput ppa:seann-giffin/dwarfs dwarfs_*.changes"
-        dput ppa:seann-giffin/dwarfs dwarfs_*.changes
-      shell: bash
+    #- name: 14 - Upload everything to Launchpad
+    #  if: steps.decision.outputs.should_build == 'true'
+    #  run: |
+    #    echo "running: dput ppa:seann-giffin/dwarfs dwarfs_*.changes"
+    #    dput ppa:seann-giffin/dwarfs dwarfs_*.changes
+    #  shell: bash
 
-    - name: 15 - Extract upstream changelog or fallback
+    - name: 14 - Extract upstream changelog or fallback
       if: steps.decision.outputs.should_build == 'true'
       id: changelog
       run: |
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
+        END_CHANGELOG="END_CHANGELOG_$(uuidgen 2>/dev/null || date +%s%N)"
+        echo "END_CHANGELOG=$END_CHANGELOG"
         curl -sL https://raw.githubusercontent.com/mhx/dwarfs/main/CHANGES.md -o changes.md || echo "" > changes.md
         if grep -q "^## $TAG" changes.md; then
           echo "awk \"/^## $TAG/,/^## v/\" changes.md | sed '$d' > extracted.txt"
           awk "/^## $TAG/,/^## v/" changes.md | sed '$d' > extracted.txt
-          cat extracted.txt
         else
           echo "git log --pretty=format:\"* %s\" ${TAG}^..${TAG} > extracted.txt || echo \"See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG\" > extracted.txt"
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
-          cat extracted.txt
         fi
-        END_CHANGELOG="END_CHANGELOG_$(uuidgen 2>/dev/null || date +%s%N)"
-        echo "END_CHANGELOG=$END_CHANGELOG"
+        cat extracted.txt
+        ls -l extracted.txt
+        wc -c < extracted.txt
+        echo
         if grep -q "$END_CHANGELOG" extracted.txt; then
           echo "Error: Delimiter $END_CHANGELOG found in changelog output!" >&2
           exit 1
         fi
+
         {
           echo "notes<<$END_CHANGELOG"
           cat extracted.txt
@@ -241,7 +244,7 @@ jobs:
         } >> "$GITHUB_OUTPUT"
       shell: bash
 
-    - name: 15.5 - Generate and sign SHA256 checksums
+    - name: 15 - Generate and sign SHA256 checksums
       if: steps.decision.outputs.should_build == 'true'
       id: checksums
       run: |

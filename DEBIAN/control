@@ -1,5 +1,5 @@
 Source: dwarfs
-Maintainer: mhx github@mhxnet.de
+Maintainer: mhx <github@mhxnet.de>
 Section: utils
 Priority: optional
 Standards-Version: 4.5.0
@@ -9,5 +9,5 @@ Package: dwarfs
 Architecture: amd64
 Depends: fuse3, ${misc:Depends}
 Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)
- Precompiled universal binary repackaged as a Debian package.
+ A high-performance read-only file system with built-in compression and deduplication.
  Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver.
