@@ -29,6 +29,8 @@ jobs:
     - name: 2 - Add upstream remote and fetch tags
       run: |
         git remote add upstream https://github.com/mhx/dwarfs.git
+        git submodule update --init --recursive
+        git submodule update --force
         git fetch upstream --tags
       shell: bash
 
@@ -158,7 +160,7 @@ jobs:
         GPG_TTY: ${{ runner.env.TERM }}
       shell: bash
 
-    - name: 13 - Build and sign .deb and source for Launchpad
+    - name: 13 - Build and sign .deb and source
       if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
@@ -201,14 +203,13 @@ jobs:
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
         fi
         cat extracted.txt
-        ls -l extracted.txt
-        wc -c < extracted.txt
-        echo
+        
         if grep -q "$END_CHANGELOG" extracted.txt; then
           echo "Error: Delimiter $END_CHANGELOG found in changelog output!" >&2
           exit 1
         fi
-
+        # Add a newline if the file does not end with one
+        tail -c1 extracted.txt | grep -q $'\n' || echo >> extracted.txt
         {
           echo "notes<<$END_CHANGELOG"
           cat extracted.txt
@@ -235,6 +236,8 @@ jobs:
           echo "Error: Delimiter $END_CHECKSUMS found in checksum output!" >&2
           exit 1
         fi
+        # Add a newline if the file does not end with one
+        tail -c1 checksums.txt | grep -q $'\n' || echo >> checksums.txt
         {
           echo "checksums<<$END_CHECKSUMS"
           cat checksums.txt
