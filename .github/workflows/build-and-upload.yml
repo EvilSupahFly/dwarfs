@@ -103,6 +103,7 @@ jobs:
         mkdir -p debian/source
 
         # Source stanza
+        echo "usr/bin/dwarfs usr/bin/" > debian/install
         echo "Source: dwarfs" > debian/control
         echo "Maintainer: mhx <github@mhxnet.de>" >> debian/control
         echo "Section: utils" >> debian/control
@@ -144,14 +145,14 @@ jobs:
       env:
         GPG_TTY: ${{ runner.env.TERM }}
 
-    - name: 13 - Build .deb and source package
+    - name: 13 - Build and sign .deb and source for Launchpad
       if: steps.decision.outputs.should_build == 'true'
       run: |
         TAG_NO_V=${{ steps.parse.outputs.tag_no_v }}
 
         # Create orig tarball
         tar czf dwarfs_${TAG_NO_V}.orig.tar.gz --exclude=debian --transform="s,^,dwarfs-${TAG_NO_V}/," dwarfs-${TAG_NO_V}/usr
-
+        
         # Binary build
         cp -r dwarfs-${TAG_NO_V} build-bin
         cd build-bin
@@ -192,7 +193,7 @@ jobs:
     #   done
     #  shell: bash
 
-    - name: 14 - Upload to Launchpad
+    - name: 14 - Upload everything to Launchpad
       if: steps.decision.outputs.should_build == 'true'
       run: |
         echo "running: dput ppa:seann-giffin/dwarfs dwarfs_*.changes"
@@ -212,7 +213,7 @@ jobs:
         fi
         END_CHANGELOG="EOF_CHANGELOG_${TAG}"
         {
-          echo "notes<<${END_OF_CHANGELOG}"
+          echo "notes<<${END_CHANGELOG}"
           cat extracted.txt
           echo "$END_CHANGELOG"
         } >> "$GITHUB_OUTPUT"
