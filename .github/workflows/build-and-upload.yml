@@ -220,11 +220,16 @@ jobs:
         TAG=${{ steps.resolve_tag.outputs.resolved_tag }}
         curl -sL https://raw.githubusercontent.com/mhx/dwarfs/main/CHANGES.md -o changes.md || echo "" > changes.md
         if grep -q "^## $TAG" changes.md; then
+          echo "awk \"/^## $TAG/,/^## v/\" changes.md | sed '$d' > extracted.txt"
           awk "/^## $TAG/,/^## v/" changes.md | sed '$d' > extracted.txt
+          cat extracted.txt
         else
+          echo "git log --pretty=format:\"* %s\" ${TAG}^..${TAG} > extracted.txt || echo \"See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG\" > extracted.txt"
           git log --pretty=format:"* %s" ${TAG}^..${TAG} > extracted.txt || echo "See release notes: https://github.com/mhx/dwarfs/releases/tag/$TAG" > extracted.txt
+          cat extracted.txt
         fi
         END_CHANGELOG="END_CHANGELOG_$(uuidgen 2>/dev/null || date +%s%N)"
+        echo "END_CHANGELOG=$END_CHANGELOG"
         if grep -q "$END_CHANGELOG" extracted.txt; then
           echo "Error: Delimiter $END_CHANGELOG found in changelog output!" >&2
           exit 1
