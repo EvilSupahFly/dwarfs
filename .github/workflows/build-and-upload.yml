@@ -185,34 +185,6 @@ jobs:
         done
       shell: bash
 
-    #- name: 14 - Sign source package
-    #  if: steps.decision.outputs.should_build == 'true'
-    #  run: |
-    #    KEYID=${{ steps.import_gpg.outputs.keyid }}
-    #    export GPG_TTY=$(tty)
-    #    shopt -s nullglob
-    #    files=(dwarfs_*.dsc dwarfs_*.changes)
-    #    if [ ${#files[@]} -eq 0 ]; then
-    #      echo "No files to sign"
-    #      exit 0
-    #    fi
-    #    for file in "${files[@]}"; do
-    #       echo "Signing \"$file\""
-    #        gpg --batch --yes --pinentry-mode loopback \
-    #          --passphrase "${{ secrets.GPG_PASSPHRASE }}" \
-    #          --default-key "$KEYID" \
-    #          --output "$file.asc" --detach-sign "$file"
-    #        echo "\"$file\" signed successfully"
-    #   done
-    #  shell: bash
-
-    #- name: 14 - Upload everything to Launchpad
-    #  if: steps.decision.outputs.should_build == 'true'
-    #  run: |
-    #    echo "running: dput ppa:seann-giffin/dwarfs dwarfs_*.changes"
-    #    dput ppa:seann-giffin/dwarfs dwarfs_*.changes
-    #  shell: bash
-
     - name: 14 - Extract upstream changelog or fallback
       if: steps.decision.outputs.should_build == 'true'
       id: changelog
@@ -263,7 +235,7 @@ jobs:
           echo "Error: Delimiter $END_CHECKSUMS found in checksum output!" >&2
           exit 1
         fi
-         {
+        {
           echo "checksums<<$END_CHECKSUMS"
           cat checksums.txt
           echo "$END_CHECKSUMS"
