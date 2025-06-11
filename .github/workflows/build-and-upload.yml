@@ -2,7 +2,7 @@ name: Sync Upstream and Build .deb
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # Runs every 6 hours
+    - cron: "0 */23 * * *"  # Runs once per day
   workflow_dispatch:
     inputs:
       force_build:
@@ -115,34 +115,43 @@ jobs:
         cd dwarfs-${TAG_NO_V}
         mkdir -p debian/source
 
-        # Source stanza
-        echo "usr/bin/dwarfs usr/bin/" > debian/install
-        echo "Source: dwarfs" > debian/control
-        echo "Maintainer: mhx <github@mhxnet.de>" >> debian/control
-        echo "Section: utils" >> debian/control
-        echo "Priority: optional" >> debian/control
-        echo "Standards-Version: 4.5.0" >> debian/control
-        echo "Build-Depends: debhelper (>= 11)" >> debian/control
-        echo "" >> debian/control
+        # Only create debian/install if it doesn't exist
+        [ -f debian/install ] || echo "usr/bin/dwarfs usr/bin/" > debian/install
 
-        # Binary stanza
-        echo "Package: dwarfs" >> debian/control
-        echo "Architecture: amd64" >> debian/control
-        echo "Depends: fuse3, \${misc:Depends}" >> debian/control
-        echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
-        echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
-        echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
+        # Only create debian/control if it doesn't exist
+        if [ ! -f debian/control ]; then
+          echo "Source: dwarfs" > debian/control
+          echo "Maintainer: mhx <github@mhxnet.de>" >> debian/control
+          echo "Section: utils" >> debian/control
+          echo "Priority: optional" >> debian/control
+          echo "Standards-Version: 4.5.0" >> debian/control
+          echo "Build-Depends: debhelper (>= 11)" >> debian/control
+          echo "" >> debian/control
+          echo "Package: dwarfs" >> debian/control
+          echo "Architecture: amd64" >> debian/control
+          echo "Depends: fuse3, \${misc:Depends}" >> debian/control
+          echo "Description: DwarFS (Deduplicating Warp-speed Advanced Read-only File System)" >> debian/control
+          echo " A high-performance read-only file system with built-in compression and deduplication." >> debian/control
+          echo " Includes mkdwarfs, dwarfsck, dwarfsextract, and the FUSE driver." >> debian/control
+        fi
 
-        echo '#!/usr/bin/make -f' > debian/rules
-        echo '%:' >> debian/rules
-        echo '	dh $@' >> debian/rules
-        chmod +x debian/rules
+        # Only create debian/rules if it doesn't exist
+        if [ ! -f debian/rules ]; then
+          echo '#!/usr/bin/make -f' > debian/rules
+          echo '%:' >> debian/rules
+          echo '	dh $@' >> debian/rules
+          chmod +x debian/rules
+        fi
 
-        echo "3.0 (native)" > debian/source/format
-        echo "12" > debian/compat
+        # Only create debian/source/format if it doesn't exist
+        [ -f debian/source/format ] || echo "3.0 (native)" > debian/source/format
+
+        # Only create debian/compat if it doesn't exist
+        [ -f debian/compat ] || echo "12" > debian/compat
 
         export DEBEMAIL="github@mhxnet.de"
-        dch --create -v "${TAG_NO_V}-1" --package dwarfs -D noble "Upstream release of dwarfs ${TAG_NO_V}"
+        # Only create changelog if it doesn't exist
+        [ -f debian/changelog ] || dch --create -v "${TAG_NO_V}-1" --package dwarfs -D noble "Upstream release of dwarfs ${TAG_NO_V}"
         cd ..
       shell: bash
 

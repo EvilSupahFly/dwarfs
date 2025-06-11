@@ -1,0 +1,28 @@
+ dpkg-buildpackage -us -uc -ui -S -d
+dpkg-buildpackage: info: source package dwarfs
+dpkg-buildpackage: info: source version 0.12.4-1
+dpkg-buildpackage: info: source distribution noble
+dpkg-buildpackage: info: source changed by MHX <github@mhxnet.de>
+ dpkg-source --before-build .
+ fakeroot debian/rules clean
+dh clean
+   dh_clean
+ dpkg-source -b .
+dpkg-source: warning: native package version may not have a revision
+dpkg-source: info: using source format '3.0 (native)'
+dpkg-source: info: building dwarfs in dwarfs_0.12.4-1.tar.xz
+dpkg-source: info: building dwarfs in dwarfs_0.12.4-1.dsc
+ dpkg-genbuildinfo --build=source -O../dwarfs_0.12.4-1_source.buildinfo
+ dpkg-genchanges --build=source -O../dwarfs_0.12.4-1_source.changes
+dpkg-genchanges: info: including full source code in upload
+ dpkg-source --after-build .
+dpkg-buildpackage: info: source-only upload: Debian-native package
+Now running lintian dwarfs_0.12.4-1_source.changes ...
+E: dwarfs source: malformed-debian-changelog-version 0.12.4-1 (for native) [debian/changelog:1]
+E: dwarfs source: source-is-missing [DEBIAN/usr/local/bin/dwarfs]
+E: dwarfs source: source-is-missing [debian/usr/local/bin/dwarfs]
+E: dwarfs source: source-is-missing [dwarfs-universal-0.12.4-Linux-x86_64]
+E: dwarfs source: source-is-missing [dwarfs_0.12.4-1/usr/local/bin/dwarfs]
+W: dwarfs source: no-debian-copyright-in-source
+W: dwarfs source: no-versioned-debhelper-prerequisite 12
+Finished running lintian.

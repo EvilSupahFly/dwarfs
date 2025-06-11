@@ -106,7 +106,6 @@ add_library(
   src/reader/internal/inode_reader_v2.cpp
   src/reader/internal/metadata_types.cpp
   src/reader/internal/metadata_v2.cpp
-  src/reader/internal/periodic_executor.cpp
 )
 
 add_library(
@@ -233,7 +232,7 @@ if(LIBBROTLIDEC_FOUND AND LIBBROTLIENC_FOUND)
 endif()
 
 if(ENABLE_STACKTRACE)
-  target_link_libraries(dwarfs_common PUBLIC cpptrace::cpptrace)
+  target_link_libraries(dwarfs_common PRIVATE cpptrace::cpptrace)
 endif()
 
 target_link_libraries(dwarfs_extractor PRIVATE PkgConfig::LIBARCHIVE)
