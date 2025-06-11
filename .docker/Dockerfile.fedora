@@ -1,0 +1,54 @@
+# syntax=docker/dockerfile:1
+ARG ARCH=amd64
+FROM $ARCH/fedora:rawhide
+RUN dnf update -y
+RUN dnf install -y \
+        bash-completion \
+        vim \
+        less
+RUN dnf install -y \
+        gcc \
+        g++ \
+        clang \
+        man \
+        pip \
+        git \
+        zstd \
+        ccache \
+        ninja-build \
+        cmake \
+        make \
+        bison \
+        flex \
+        rubygem-ronn \
+        fuse \
+        fuse3 \
+        fuse-devel \
+        fuse3-devel \
+        pkg-config \
+        binutils-devel \
+        libarchive-devel \
+        google-benchmark \
+        boost-devel \
+        brotli-devel \
+        libevent-devel \
+        openssl-devel \
+        fmt-devel \
+        date-devel \
+        jemalloc-devel \
+        double-conversion-devel \
+        lz4-devel \
+        xz-devel \
+        libzstd-devel \
+        xxhash-devel \
+        libunwind-devel \
+        libdwarf-devel \
+        glog-devel \
+        flac-devel \
+        utf8cpp-devel \
+        json-devel \
+        range-v3-devel
+RUN pip install mistletoe
+RUN useradd -g users -u 1000 -m mhx
+USER mhx
+ENTRYPOINT /workspace/.docker/build-linux.sh
