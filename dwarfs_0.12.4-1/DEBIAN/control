@@ -1,0 +1,8 @@
+Package: dwarfs
+Version: 0.12.4-1
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: mhx github@mhxnet.de
+Description: DwarFS - Deduplicating Warp-speed Advanced Read-only File System
+ A high-performance read-only file system with built-in compression and deduplication.
